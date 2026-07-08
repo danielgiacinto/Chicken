@@ -1,5 +1,9 @@
 {
+  "buildCommand": "npm run build",
   "rewrites": [
     { "source": "/(.*)", "destination": "/api" }
-  ]
+  ],
+  "env": {
+    "NODEJS_HELPERS": "0"
+  }
 }
