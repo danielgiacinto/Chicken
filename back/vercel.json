@@ -1,5 +1,6 @@
 {
   "framework": "hono",
+  "installCommand": "npm install",
   "env": {
     "NODEJS_HELPERS": "0"
   }
