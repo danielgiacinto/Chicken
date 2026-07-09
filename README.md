@@ -70,7 +70,7 @@ Ejecutá las migrations en el SQL Editor del proyecto de producción (mismos arc
 
 1. Importá el repo en [vercel.com](https://vercel.com)
 2. **Root Directory:** `back`
-3. **Framework Preset:** Other
+3. **Framework Preset:** Hono
 4. Variables de entorno:
 
 | Variable | Valor |
@@ -80,7 +80,7 @@ Ejecutá las migrations en el SQL Editor del proyecto de producción (mismos arc
 | `JWT_SECRETO` | String aleatorio de 64+ caracteres |
 | `AUTH_USUARIO` | `cuos` |
 | `AUTH_CLAVE` | `perrohugo` |
-| `FRONT_URL` | URL del front en Vercel (la configurás después) |
+| `FRONT_URL` | `https://chicken-cuos.vercel.app` |
 
 5. Deploy. Anotá la URL, ej: `https://chicken-back.vercel.app`
 
