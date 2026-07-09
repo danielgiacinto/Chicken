@@ -1,5 +1,7 @@
 {
-  "framework": "hono",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/api" }
+  ],
   "env": {
     "NODEJS_HELPERS": "0"
   }
