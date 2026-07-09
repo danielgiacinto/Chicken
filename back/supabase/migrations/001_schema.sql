@@ -6,8 +6,7 @@ CREATE TABLE IF NOT EXISTS integrantes (
   menus_comprados INTEGER NOT NULL DEFAULT 0 CHECK (menus_comprados >= 0),
   menus_usados INTEGER NOT NULL DEFAULT 0 CHECK (menus_usados >= 0),
   ultimo_pedido DATE,
-  creado_en TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT chk_saldo_no_negativo CHECK (menus_comprados >= menus_usados)
+  creado_en TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS movimientos (

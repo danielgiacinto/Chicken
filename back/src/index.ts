@@ -66,7 +66,7 @@ app.use(
       if (origen.endsWith('.vercel.app')) return origen;
       return origenesPermitidos[0] ?? '*';
     },
-    allowMethods: ['GET', 'POST', 'OPTIONS'],
+      allowMethods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization'],
   }),
 );
@@ -118,6 +118,131 @@ app.get('/integrantes', verificarJwt, async (c) => {
   return c.json({ integrantes, totales });
 });
 
+function mapearErrorDb(mensaje: string): string {
+  if (mensaje.includes('chk_saldo_no_negativo')) {
+    return 'La base de datos bloquea saldo negativo. Ejecutá en Supabase: ALTER TABLE integrantes DROP CONSTRAINT IF EXISTS chk_saldo_no_negativo;';
+  }
+  return mensaje;
+}
+
+async function obtenerSaldoTotal(supabase: ReturnType<typeof obtenerSupabase>) {
+  const { data, error } = await supabase
+    .from('integrantes')
+    .select('menus_comprados, menus_usados');
+
+  if (error) throw new Error(error.message);
+
+  return (data ?? []).reduce(
+    (acc, fila) => acc + (fila.menus_comprados - fila.menus_usados),
+    0,
+  );
+}
+
+app.post('/integrantes/consumir-masivo', verificarJwt, async (c) => {
+  const cuerpo = await c.req.json<{ ids?: string[] }>();
+  const ids = cuerpo.ids ?? [];
+
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return c.json({ error: 'Seleccioná al menos un integrante' }, 400);
+  }
+
+  const supabase = obtenerSupabase();
+  let saldoTotal: number;
+
+  try {
+    saldoTotal = await obtenerSaldoTotal(supabase);
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : 'Error al consultar saldo' }, 500);
+  }
+
+  if (saldoTotal < ids.length) {
+    return c.json(
+      { error: `Saldo total insuficiente. Hay ${saldoTotal} menús para ${ids.length} consumos` },
+      400,
+    );
+  }
+
+  const hoy = new Date().toISOString().split('T')[0];
+  const procesados: string[] = [];
+
+  for (const id of ids) {
+    const { data: integrante, error: errorConsulta } = await supabase
+      .from('integrantes')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (errorConsulta || !integrante) continue;
+
+    const { error: errorActualizar } = await supabase
+      .from('integrantes')
+      .update({ menus_usados: integrante.menus_usados + 1, ultimo_pedido: hoy })
+      .eq('id', id);
+
+    if (errorActualizar) {
+      return c.json({ error: mapearErrorDb(errorActualizar.message) }, 500);
+    }
+
+    await supabase.from('movimientos').insert({
+      integrante_id: id,
+      tipo: 'consumo',
+      cantidad: 1,
+      nota: 'Consumo de menú (masivo)',
+    });
+
+    procesados.push(integrante.nombre);
+  }
+
+  return c.json({ procesados, cantidad: procesados.length });
+});
+
+app.post('/integrantes/comprar-masivo', verificarJwt, async (c) => {
+  const cuerpo = await c.req.json<{ ids?: string[]; cantidad?: number }>();
+  const ids = cuerpo.ids ?? [];
+  const cantidad = cuerpo.cantidad ?? 10;
+
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return c.json({ error: 'Seleccioná al menos un integrante' }, 400);
+  }
+
+  if (!Number.isInteger(cantidad) || cantidad <= 0) {
+    return c.json({ error: 'La cantidad debe ser un entero positivo' }, 400);
+  }
+
+  const supabase = obtenerSupabase();
+  const procesados: string[] = [];
+
+  for (const id of ids) {
+    const { data: integrante, error: errorConsulta } = await supabase
+      .from('integrantes')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (errorConsulta || !integrante) continue;
+
+    const { error: errorActualizar } = await supabase
+      .from('integrantes')
+      .update({ menus_comprados: integrante.menus_comprados + cantidad })
+      .eq('id', id);
+
+    if (errorActualizar) {
+      return c.json({ error: mapearErrorDb(errorActualizar.message) }, 500);
+    }
+
+    await supabase.from('movimientos').insert({
+      integrante_id: id,
+      tipo: 'compra',
+      cantidad,
+      nota: `Compra de ${cantidad} menús (masivo)`,
+    });
+
+    procesados.push(integrante.nombre);
+  }
+
+  return c.json({ procesados, cantidad: cantidad, personas: procesados.length });
+});
+
 app.post('/integrantes/:id/consumir', verificarJwt, async (c) => {
   const id = c.req.param('id');
   const supabase = obtenerSupabase();
@@ -131,9 +256,21 @@ app.post('/integrantes/:id/consumir', verificarJwt, async (c) => {
     return c.json({ error: 'Integrante no encontrado' }, 404);
   }
 
-  const saldo = integrante.menus_comprados - integrante.menus_usados;
-  if (saldo <= 0) {
-    return c.json({ error: 'Sin saldo disponible para consumir' }, 400);
+  const { data: todos, error: errorTotales } = await supabase
+    .from('integrantes')
+    .select('menus_comprados, menus_usados');
+
+  if (errorTotales) {
+    return c.json({ error: errorTotales.message }, 500);
+  }
+
+  const saldoTotal = (todos ?? []).reduce(
+    (acc, fila) => acc + (fila.menus_comprados - fila.menus_usados),
+    0,
+  );
+
+  if (saldoTotal <= 0) {
+    return c.json({ error: 'Sin saldo total disponible en el equipo' }, 400);
   }
 
   const hoy = new Date().toISOString().split('T')[0];
@@ -144,7 +281,7 @@ app.post('/integrantes/:id/consumir', verificarJwt, async (c) => {
     .select('*')
     .single();
 
-  if (errorActualizar) return c.json({ error: errorActualizar.message }, 500);
+  if (errorActualizar) return c.json({ error: mapearErrorDb(errorActualizar.message) }, 500);
 
   await supabase.from('movimientos').insert({
     integrante_id: id,
@@ -193,7 +330,7 @@ app.post('/integrantes/:id/comprar', verificarJwt, async (c) => {
     .select('*')
     .single();
 
-  if (errorActualizar) return c.json({ error: errorActualizar.message }, 500);
+  if (errorActualizar) return c.json({ error: mapearErrorDb(errorActualizar.message) }, 500);
 
   await supabase.from('movimientos').insert({
     integrante_id: id,
@@ -212,16 +349,23 @@ app.post('/integrantes/:id/comprar', verificarJwt, async (c) => {
 
 app.get('/movimientos', verificarJwt, async (c) => {
   const integranteId = c.req.query('integrante_id');
+  const fecha = c.req.query('fecha');
   const supabase = obtenerSupabase();
 
   let consulta = supabase
     .from('movimientos')
     .select('*, integrantes(nombre)')
     .order('fecha', { ascending: false })
-    .limit(100);
+    .limit(200);
 
   if (integranteId) {
     consulta = consulta.eq('integrante_id', integranteId);
+  }
+
+  if (fecha) {
+    consulta = consulta
+      .gte('fecha', `${fecha}T00:00:00`)
+      .lte('fecha', `${fecha}T23:59:59`);
   }
 
   const { data, error } = await consulta;
@@ -235,6 +379,26 @@ app.get('/configuracion', verificarJwt, async (c) => {
     .from('configuracion')
     .select('*')
     .eq('id', 1)
+    .single();
+
+  if (error) return c.json({ error: error.message }, 500);
+  return c.json({ configuracion: data });
+});
+
+app.patch('/configuracion', verificarJwt, async (c) => {
+  const cuerpo = await c.req.json<{ valor_menu?: number }>();
+  const valorMenu = cuerpo.valor_menu;
+
+  if (valorMenu === undefined || Number.isNaN(valorMenu) || valorMenu <= 0) {
+    return c.json({ error: 'El valor del menú debe ser un número positivo' }, 400);
+  }
+
+  const supabase = obtenerSupabase();
+  const { data, error } = await supabase
+    .from('configuracion')
+    .update({ valor_menu: valorMenu })
+    .eq('id', 1)
+    .select('*')
     .single();
 
   if (error) return c.json({ error: error.message }, 500);

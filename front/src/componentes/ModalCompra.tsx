@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 interface PropsModalCompra {
   abierto: boolean;
@@ -17,12 +17,15 @@ export default function ModalCompra({
   const [cantidad, setCantidad] = useState(10);
   const [cargando, setCargando] = useState(false);
 
+  useEffect(() => {
+    if (abierto) setCantidad(10);
+  }, [abierto]);
+
   async function manejarConfirmar() {
     setCargando(true);
     try {
       await onConfirmar(cantidad);
       onCerrar();
-      setCantidad(10);
     } finally {
       setCargando(false);
     }
@@ -46,7 +49,7 @@ export default function ModalCompra({
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="font-display mb-1 text-xl text-pollo-verde">
-              Comprar pollito 🐣
+              Comprar Chickenaso 🐣
             </h2>
             <p className="mb-5 text-sm text-white/50">
               Sumar menús comprados para <strong className="text-white">{nombreIntegrante}</strong>
@@ -55,22 +58,6 @@ export default function ModalCompra({
             <label className="mb-1 block text-xs uppercase tracking-wider text-white/40">
               Cantidad de menús
             </label>
-            <div className="mb-5 flex gap-2">
-              {[10, 5, 20].map((valor) => (
-                <button
-                  key={valor}
-                  type="button"
-                  onClick={() => setCantidad(valor)}
-                  className={`flex-1 rounded-lg py-2 text-sm font-medium transition ${
-                    cantidad === valor
-                      ? 'btn-comprar'
-                      : 'border border-white/10 bg-white/5 text-white/60'
-                  }`}
-                >
-                  {valor}
-                </button>
-              ))}
-            </div>
             <input
               type="number"
               min={1}

@@ -50,10 +50,10 @@ export default function PaginaLogin() {
             🐔
           </motion.span>
           <h1 className="font-display text-3xl tracking-wide text-pollo-neon">
-            CHICKEN COOP
+            CHICKEN CUOS
           </h1>
           <p className="mt-2 text-sm text-white/50">
-            Entrá al gallinero para llevar la cuenta
+            Entrá al sistema hecho por cursor para llevar la cuenta
           </p>
         </div>
 
@@ -104,7 +104,7 @@ export default function PaginaLogin() {
             disabled={cargando}
             className="btn-primario font-display w-full rounded-xl py-3 text-sm tracking-wider disabled:opacity-50"
           >
-            {cargando ? 'Abriendo el gallinero...' : 'ENTRAR AL GALLINERO'}
+            {cargando ? 'Ingresando...' : 'INGRESAR'}
           </motion.button>
         </form>
       </motion.div>

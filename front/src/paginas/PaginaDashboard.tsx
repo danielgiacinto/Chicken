@@ -1,11 +1,15 @@
 import { motion } from 'framer-motion';
 import { useCallback, useEffect, useState } from 'react';
 import Encabezado from '../componentes/Encabezado';
+import ModalAviso from '../componentes/ModalAviso';
 import TablaIntegrantes from '../componentes/TablaIntegrantes';
 import { useAuth } from '../hooks/useAuth';
 import {
+  actualizarValorMenu,
   comprarMenus,
+  comprarMenusMasivo,
   consumirMenu,
+  consumirMenuMasivo,
   obtenerConfiguracion,
   obtenerIntegrantes,
 } from '../servicios/api';
@@ -26,6 +30,7 @@ export default function PaginaDashboard() {
   });
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
+  const [aviso, setAviso] = useState('');
 
   const cargarDatos = useCallback(async () => {
     if (!token) return;
@@ -61,6 +66,26 @@ export default function PaginaDashboard() {
     await cargarDatos();
   }
 
+  async function manejarConsumirMasivo(ids: string[]) {
+    if (!token) return { procesados: [] };
+    const resp = await consumirMenuMasivo(token, ids);
+    await cargarDatos();
+    return resp;
+  }
+
+  async function manejarComprarMasivo(ids: string[], cantidad: number) {
+    if (!token) return { procesados: [], cantidad };
+    const resp = await comprarMenusMasivo(token, ids, cantidad);
+    await cargarDatos();
+    return resp;
+  }
+
+  async function manejarValorMenuActualizado(valor: number) {
+    if (!token) return;
+    const resp = await actualizarValorMenu(token, valor);
+    setConfiguracion(resp.configuracion);
+  }
+
   if (cargando) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -80,6 +105,7 @@ export default function PaginaDashboard() {
       <Encabezado
         aliasChicken={configuracion.alias_chicken}
         valorMenu={Number(configuracion.valor_menu)}
+        onValorMenuActualizado={manejarValorMenuActualizado}
       />
 
       {error && (
@@ -91,7 +117,26 @@ export default function PaginaDashboard() {
         totales={totales}
         onConsumir={manejarConsumir}
         onComprar={manejarComprar}
+        onConsumirMasivo={manejarConsumirMasivo}
+        onComprarMasivo={manejarComprarMasivo}
+        onAccionExitosa={(accion) => {
+          if (accion.tipo === 'consumo') {
+            if (accion.masivo && accion.personas) {
+              setAviso(`¡${accion.personas.length} integrantes picotearon! 🍗\n${accion.personas.join(', ')}`);
+            } else {
+              setAviso(`¡${accion.nombre} picoteó un menú! 🍗`);
+            }
+          } else if (accion.masivo && accion.personas) {
+            setAviso(
+              `¡${accion.personas.length} integrantes compraron ${accion.cantidad} menús c/u! 🐣\n${accion.personas.join(', ')}`,
+            );
+          } else {
+            setAviso(`¡${accion.nombre} compró ${accion.cantidad} menús! 🐣`);
+          }
+        }}
       />
+
+      <ModalAviso abierto={!!aviso} mensaje={aviso} onCerrar={() => setAviso('')} />
     </main>
   );
 }

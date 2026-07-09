@@ -68,6 +68,17 @@ export async function consumirMenu(
   return solicitud(`/integrantes/${id}/consumir`, { method: 'POST' }, token);
 }
 
+export async function consumirMenuMasivo(
+  token: string,
+  ids: string[],
+): Promise<{ procesados: string[]; cantidad: number }> {
+  return solicitud(
+    '/integrantes/consumir-masivo',
+    { method: 'POST', body: JSON.stringify({ ids }) },
+    token,
+  );
+}
+
 export async function comprarMenus(
   token: string,
   id: string,
@@ -80,11 +91,26 @@ export async function comprarMenus(
   );
 }
 
+export async function comprarMenusMasivo(
+  token: string,
+  ids: string[],
+  cantidad: number,
+): Promise<{ procesados: string[]; cantidad: number; personas: number }> {
+  return solicitud(
+    '/integrantes/comprar-masivo',
+    { method: 'POST', body: JSON.stringify({ ids, cantidad }) },
+    token,
+  );
+}
+
 export async function obtenerMovimientos(
   token: string,
-  integranteId?: string,
+  opciones?: { integranteId?: string; fecha?: string },
 ): Promise<{ movimientos: Movimiento[] }> {
-  const query = integranteId ? `?integrante_id=${integranteId}` : '';
+  const params = new URLSearchParams();
+  if (opciones?.integranteId) params.set('integrante_id', opciones.integranteId);
+  if (opciones?.fecha) params.set('fecha', opciones.fecha);
+  const query = params.toString() ? `?${params.toString()}` : '';
   return solicitud(`/movimientos${query}`, {}, token);
 }
 
@@ -92,6 +118,17 @@ export async function obtenerConfiguracion(
   token: string,
 ): Promise<{ configuracion: Configuracion }> {
   return solicitud('/configuracion', {}, token);
+}
+
+export async function actualizarValorMenu(
+  token: string,
+  valorMenu: number,
+): Promise<{ configuracion: Configuracion }> {
+  return solicitud(
+    '/configuracion',
+    { method: 'PATCH', body: JSON.stringify({ valor_menu: valorMenu }) },
+    token,
+  );
 }
 
 export { ErrorApi };

@@ -1,9 +1,9 @@
+import 'dotenv/config';
 import { serve } from '@hono/node-server';
-import { crearApp } from './app';
+import app from './index';
 
 const puerto = Number(process.env.PORT ?? 3001);
-const app = crearApp();
 
 serve({ fetch: app.fetch, port: puerto }, () => {
-  console.log(`Chicken API corriendo en http://localhost:${puerto}`);
+  console.log(`Chicken API → http://localhost:${puerto}/api/health`);
 });
