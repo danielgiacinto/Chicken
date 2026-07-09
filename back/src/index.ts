@@ -64,23 +64,36 @@ const intentosLogin = new Map<string, { contador: number; reinicio: number }>();
 
 const app = new Hono().basePath('/api');
 
-const origenesPermitidos = [
-  process.env.FRONT_URL,
-  'http://localhost:5173',
-  'http://127.0.0.1:5173',
-].filter(Boolean) as string[];
+function normalizarOrigen(origen: string): string {
+  return origen.replace(/\/$/, '');
+}
+
+function esOrigenPermitido(origen: string): boolean {
+  const origenNormalizado = normalizarOrigen(origen);
+  const origenesPermitidos = [
+    process.env.FRONT_URL,
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+  ]
+    .filter(Boolean)
+    .map((url) => normalizarOrigen(url!));
+
+  if (origenesPermitidos.includes(origenNormalizado)) return true;
+  if (origenNormalizado.endsWith('.vercel.app')) return true;
+  return false;
+}
 
 app.use(
   '*',
   cors({
     origin: (origen) => {
-      if (!origen) return '*';
-      if (origenesPermitidos.includes(origen)) return origen;
-      if (origen.endsWith('.vercel.app')) return origen;
-      return origenesPermitidos[0] ?? '*';
+      if (!origen) return process.env.FRONT_URL ?? 'http://localhost:5173';
+      if (esOrigenPermitido(origen)) return origen;
+      return null;
     },
-      allowMethods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
+    allowMethods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization'],
+    maxAge: 86400,
   }),
 );
 
