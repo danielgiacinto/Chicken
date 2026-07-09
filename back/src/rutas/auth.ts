@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { crearToken } from '../lib/jwt.js';
+import { crearToken } from '../lib/jwt';
 
 const intentosLogin = new Map<string, { contador: number; reinicio: number }>();
 const LIMITE_INTENTOS = 5;

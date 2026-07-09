@@ -4,8 +4,8 @@ import {
   IntegranteConSaldo,
   TotalesIntegrantes,
   obtenerSupabase,
-} from '../lib/supabase.js';
-import { verificarJwt } from '../middleware/verificarJwt.js';
+} from '../lib/supabase';
+import { verificarJwt } from '../middleware/verificarJwt';
 
 function calcularSaldo(integrante: Integrante): number {
   return integrante.menus_comprados - integrante.menus_usados;

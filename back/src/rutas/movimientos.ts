@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
-import { Movimiento, obtenerSupabase } from '../lib/supabase.js';
-import { verificarJwt } from '../middleware/verificarJwt.js';
+import { Movimiento, obtenerSupabase } from '../lib/supabase';
+import { verificarJwt } from '../middleware/verificarJwt';
 
 export const rutasMovimientos = new Hono();
 

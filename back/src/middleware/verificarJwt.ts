@@ -1,5 +1,5 @@
 import { Context, Next } from 'hono';
-import { verificarToken } from '../lib/jwt.js';
+import { verificarToken } from '../lib/jwt';
 
 export async function verificarJwt(c: Context, next: Next) {
   const encabezado = c.req.header('Authorization');

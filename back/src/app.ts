@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { rutasAuth } from './rutas/auth.js';
-import { rutasIntegrantes } from './rutas/integrantes.js';
-import { rutasMovimientos } from './rutas/movimientos.js';
-import { rutasConfiguracion } from './rutas/configuracion.js';
+import { rutasAuth } from './rutas/auth';
+import { rutasIntegrantes } from './rutas/integrantes';
+import { rutasMovimientos } from './rutas/movimientos';
+import { rutasConfiguracion } from './rutas/configuracion';
 
 export function crearApp() {
   const app = new Hono().basePath('/api');

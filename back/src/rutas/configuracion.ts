@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
-import { Configuracion, obtenerSupabase } from '../lib/supabase.js';
-import { verificarJwt } from '../middleware/verificarJwt.js';
+import { Configuracion, obtenerSupabase } from '../lib/supabase';
+import { verificarJwt } from '../middleware/verificarJwt';
 
 export const rutasConfiguracion = new Hono();
 
