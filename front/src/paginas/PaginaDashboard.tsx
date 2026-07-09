@@ -34,20 +34,31 @@ export default function PaginaDashboard() {
 
   const cargarDatos = useCallback(async () => {
     if (!token) return;
+    setCargando(true);
     setError('');
+
+    const errores: string[] = [];
+
     try {
-      const [respIntegrantes, respConfig] = await Promise.all([
-        obtenerIntegrantes(token),
-        obtenerConfiguracion(token),
-      ]);
+      const respIntegrantes = await obtenerIntegrantes(token);
       setIntegrantes(respIntegrantes.integrantes);
       setTotales(respIntegrantes.totales);
+    } catch {
+      errores.push('integrantes');
+    }
+
+    try {
+      const respConfig = await obtenerConfiguracion(token);
       setConfiguracion(respConfig.configuracion);
     } catch {
-      setError('No se pudieron cargar los datos');
-    } finally {
-      setCargando(false);
+      errores.push('configuración');
     }
+
+    if (errores.length > 0) {
+      setError(`No se pudieron cargar: ${errores.join(', ')}`);
+    }
+
+    setCargando(false);
   }, [token]);
 
   useEffect(() => {

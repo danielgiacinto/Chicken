@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 import { createClient } from '@supabase/supabase-js';
 import { SignJWT, jwtVerify } from 'jose';
 import type { Context, Next } from 'hono';
+import { obtenerFechaHoyArgentina, obtenerRangoDiaArgentina } from './lib/fecha';
 
 function obtenerSupabase() {
   const url = process.env.SUPABASE_URL;
@@ -162,7 +163,7 @@ app.post('/integrantes/consumir-masivo', verificarJwt, async (c) => {
     );
   }
 
-  const hoy = new Date().toISOString().split('T')[0];
+  const hoy = obtenerFechaHoyArgentina();
   const procesados: string[] = [];
 
   for (const id of ids) {
@@ -273,7 +274,7 @@ app.post('/integrantes/:id/consumir', verificarJwt, async (c) => {
     return c.json({ error: 'Sin saldo total disponible en el equipo' }, 400);
   }
 
-  const hoy = new Date().toISOString().split('T')[0];
+  const hoy = obtenerFechaHoyArgentina();
   const { data: actualizado, error: errorActualizar } = await supabase
     .from('integrantes')
     .update({ menus_usados: integrante.menus_usados + 1, ultimo_pedido: hoy })
@@ -363,9 +364,8 @@ app.get('/movimientos', verificarJwt, async (c) => {
   }
 
   if (fecha) {
-    consulta = consulta
-      .gte('fecha', `${fecha}T00:00:00`)
-      .lte('fecha', `${fecha}T23:59:59`);
+    const { inicio, fin } = obtenerRangoDiaArgentina(fecha);
+    consulta = consulta.gte('fecha', inicio).lte('fecha', fin);
   }
 
   const { data, error } = await consulta;
@@ -373,16 +373,22 @@ app.get('/movimientos', verificarJwt, async (c) => {
   return c.json({ movimientos: data });
 });
 
+const CONFIGURACION_POR_DEFECTO = {
+  id: 1,
+  valor_menu: 8550,
+  alias_chicken: 'viviana.teruel',
+};
+
 app.get('/configuracion', verificarJwt, async (c) => {
   const supabase = obtenerSupabase();
   const { data, error } = await supabase
     .from('configuracion')
     .select('*')
     .eq('id', 1)
-    .single();
+    .maybeSingle();
 
   if (error) return c.json({ error: error.message }, 500);
-  return c.json({ configuracion: data });
+  return c.json({ configuracion: data ?? CONFIGURACION_POR_DEFECTO });
 });
 
 app.patch('/configuracion', verificarJwt, async (c) => {

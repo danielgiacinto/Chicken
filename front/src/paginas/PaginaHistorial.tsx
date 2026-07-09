@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { obtenerIntegrantes, obtenerMovimientos } from '../servicios/api';
 import type { Integrante, Movimiento } from '../tipos';
+import { obtenerFechaHoyLocal } from '../utilidades/fecha';
 
 function formatearFechaHora(fecha: string): string {
   return new Date(fecha).toLocaleString('es-AR', {
@@ -12,11 +13,8 @@ function formatearFechaHora(fecha: string): string {
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'America/Argentina/Buenos_Aires',
   });
-}
-
-function obtenerFechaHoy(): string {
-  return new Date().toISOString().split('T')[0];
 }
 
 export default function PaginaHistorial() {
@@ -24,37 +22,58 @@ export default function PaginaHistorial() {
   const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
   const [integrantes, setIntegrantes] = useState<Integrante[]>([]);
   const [filtroId, setFiltroId] = useState('');
-  const [fecha, setFecha] = useState(obtenerFechaHoy());
-  const [cargando, setCargando] = useState(true);
+  const [fecha, setFecha] = useState(obtenerFechaHoyLocal());
+  const [cargandoMovimientos, setCargandoMovimientos] = useState(true);
+  const [cargandoIntegrantes, setCargandoIntegrantes] = useState(true);
+  const [error, setError] = useState('');
 
-  const cargarDatos = useCallback(async () => {
+  const cargarIntegrantes = useCallback(async () => {
     if (!token) return;
-    setCargando(true);
+    setCargandoIntegrantes(true);
     try {
-      const [respMovimientos, respIntegrantes] = await Promise.all([
-        obtenerMovimientos(token, {
-          integranteId: filtroId || undefined,
-          fecha,
-        }),
-        obtenerIntegrantes(token),
-      ]);
-      setMovimientos(respMovimientos.movimientos);
-      setIntegrantes(respIntegrantes.integrantes);
+      const resp = await obtenerIntegrantes(token);
+      setIntegrantes(resp.integrantes);
+    } catch {
+      setError('No se pudieron cargar los integrantes');
     } finally {
-      setCargando(false);
+      setCargandoIntegrantes(false);
+    }
+  }, [token]);
+
+  const cargarMovimientos = useCallback(async () => {
+    if (!token) return;
+    setCargandoMovimientos(true);
+    setError('');
+    try {
+      const resp = await obtenerMovimientos(token, {
+        integranteId: filtroId || undefined,
+        fecha,
+      });
+      setMovimientos(resp.movimientos);
+    } catch {
+      setError('No se pudieron cargar los movimientos');
+      setMovimientos([]);
+    } finally {
+      setCargandoMovimientos(false);
     }
   }, [token, filtroId, fecha]);
 
   useEffect(() => {
-    cargarDatos();
-  }, [cargarDatos]);
+    cargarIntegrantes();
+  }, [cargarIntegrantes]);
+
+  useEffect(() => {
+    cargarMovimientos();
+  }, [cargarMovimientos]);
+
+  const cargando = cargandoMovimientos || cargandoIntegrantes;
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="font-display text-2xl text-pollo-neon">Historial</h1>
-          <p className="text-sm text-white/40">Movimientos del día</p>
+          <p className="text-sm text-white/40">Movimientos del día (hora Argentina)</p>
         </div>
         <Link
           to="/"
@@ -72,7 +91,7 @@ export default function PaginaHistorial() {
           <input
             type="date"
             value={fecha}
-            max={obtenerFechaHoy()}
+            max={obtenerFechaHoyLocal()}
             onChange={(e) => setFecha(e.target.value)}
             className="select-tema w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white"
           />
@@ -84,7 +103,8 @@ export default function PaginaHistorial() {
           <select
             value={filtroId}
             onChange={(e) => setFiltroId(e.target.value)}
-            className="select-tema w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white"
+            disabled={cargandoIntegrantes}
+            className="select-tema w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white disabled:opacity-50"
           >
             <option value="" className="bg-[#1a0f2e] text-white">
               Todos
@@ -97,6 +117,10 @@ export default function PaginaHistorial() {
           </select>
         </div>
       </div>
+
+      {error && (
+        <p className="mb-4 rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-400">{error}</p>
+      )}
 
       {cargando ? (
         <div className="py-12 text-center text-4xl">🐔</div>
