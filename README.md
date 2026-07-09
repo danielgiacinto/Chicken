@@ -70,7 +70,7 @@ Ejecutá las migrations en el SQL Editor del proyecto de producción (mismos arc
 
 1. Importá el repo en [vercel.com](https://vercel.com)
 2. **Root Directory:** `back`
-3. **Framework Preset:** Other
+3. **Framework Preset:** Hono
 4. Variables de entorno:
 
 | Variable | Valor |

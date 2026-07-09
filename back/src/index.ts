@@ -1,11 +1,8 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { handle } from 'hono/vercel';
 import { createClient } from '@supabase/supabase-js';
 import { SignJWT, jwtVerify } from 'jose';
 import type { Context, Next } from 'hono';
-
-// --- Supabase ---
 
 function obtenerSupabase() {
   const url = process.env.SUPABASE_URL;
@@ -15,8 +12,6 @@ function obtenerSupabase() {
   }
   return createClient(url, clave);
 }
-
-// --- JWT ---
 
 function obtenerSecretoJwt(): Uint8Array {
   const secreto = process.env.JWT_SECRETO;
@@ -52,8 +47,6 @@ async function verificarJwt(c: Context, next: Next) {
   }
 }
 
-// --- App ---
-
 const intentosLogin = new Map<string, { contador: number; reinicio: number }>();
 
 const app = new Hono().basePath('/api');
@@ -80,7 +73,6 @@ app.use(
 
 app.get('/health', (c) => c.json({ estado: 'ok', gallina: 'feliz' }));
 
-// Auth
 app.post('/auth/login', async (c) => {
   const ip = c.req.header('x-forwarded-for') ?? 'local';
   const ahora = Date.now();
@@ -106,7 +98,6 @@ app.post('/auth/login', async (c) => {
   return c.json({ token, usuario: cuerpo.usuario });
 });
 
-// Integrantes (protegido)
 app.get('/integrantes', verificarJwt, async (c) => {
   const supabase = obtenerSupabase();
   const { data, error } = await supabase.from('integrantes').select('*').order('nombre');
@@ -219,7 +210,6 @@ app.post('/integrantes/:id/comprar', verificarJwt, async (c) => {
   });
 });
 
-// Movimientos (protegido)
 app.get('/movimientos', verificarJwt, async (c) => {
   const integranteId = c.req.query('integrante_id');
   const supabase = obtenerSupabase();
@@ -239,7 +229,6 @@ app.get('/movimientos', verificarJwt, async (c) => {
   return c.json({ movimientos: data });
 });
 
-// Configuración (protegido)
 app.get('/configuracion', verificarJwt, async (c) => {
   const supabase = obtenerSupabase();
   const { data, error } = await supabase
@@ -252,4 +241,4 @@ app.get('/configuracion', verificarJwt, async (c) => {
   return c.json({ configuracion: data });
 });
 
-export default handle(app);
+export default app;
