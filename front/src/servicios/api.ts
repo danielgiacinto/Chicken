@@ -114,6 +114,13 @@ export async function obtenerMovimientos(
   return solicitud(`/movimientos${query}`, {}, token);
 }
 
+export async function revertirMovimiento(
+  token: string,
+  id: string,
+): Promise<{ integrante: Integrante }> {
+  return solicitud(`/movimientos/${id}/revertir`, { method: 'POST' }, token);
+}
+
 export async function obtenerConfiguracion(
   token: string,
 ): Promise<{ configuracion: Configuracion }> {

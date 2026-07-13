@@ -398,6 +398,73 @@ app.get('/movimientos', verificarJwt, async (c) => {
   return c.json({ movimientos: data });
 });
 
+app.post('/movimientos/:id/revertir', verificarJwt, async (c) => {
+  const id = c.req.param('id');
+  const supabase = obtenerSupabase();
+
+  const { data: movimiento, error: errorConsulta } = await supabase
+    .from('movimientos')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (errorConsulta || !movimiento) {
+    return c.json({ error: 'Movimiento no encontrado' }, 404);
+  }
+
+  if (movimiento.tipo !== 'consumo') {
+    return c.json({ error: 'Solo se pueden revertir consumos' }, 400);
+  }
+
+  if (movimiento.revertido) {
+    return c.json({ error: 'Este consumo ya fue revertido' }, 400);
+  }
+
+  const { data: integrante, error: errorIntegrante } = await supabase
+    .from('integrantes')
+    .select('*')
+    .eq('id', movimiento.integrante_id)
+    .single();
+
+  if (errorIntegrante || !integrante) {
+    return c.json({ error: 'Integrante no encontrado' }, 404);
+  }
+
+  if (integrante.menus_usados < movimiento.cantidad) {
+    return c.json({ error: 'No se puede revertir: menús usados insuficientes' }, 400);
+  }
+
+  const { data: actualizado, error: errorActualizar } = await supabase
+    .from('integrantes')
+    .update({ menus_usados: integrante.menus_usados - movimiento.cantidad })
+    .eq('id', integrante.id)
+    .select('*')
+    .single();
+
+  if (errorActualizar) return c.json({ error: mapearErrorDb(errorActualizar.message) }, 500);
+
+  const { error: errorMarcar } = await supabase
+    .from('movimientos')
+    .update({ revertido: true })
+    .eq('id', id);
+
+  if (errorMarcar) return c.json({ error: errorMarcar.message }, 500);
+
+  await supabase.from('movimientos').insert({
+    integrante_id: integrante.id,
+    tipo: 'reversion',
+    cantidad: movimiento.cantidad,
+    nota: `Reversión de consumo (${integrante.nombre})`,
+  });
+
+  return c.json({
+    integrante: {
+      ...actualizado,
+      saldo: actualizado!.menus_comprados - actualizado!.menus_usados,
+    },
+  });
+});
+
 const CONFIGURACION_POR_DEFECTO = {
   id: 1,
   valor_menu: 8550,

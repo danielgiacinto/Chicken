@@ -1,8 +1,9 @@
 import { motion } from 'framer-motion';
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import ModalConfirmacion from '../componentes/ModalConfirmacion';
 import { useAuth } from '../hooks/useAuth';
-import { obtenerIntegrantes, obtenerMovimientos } from '../servicios/api';
+import { obtenerIntegrantes, obtenerMovimientos, revertirMovimiento } from '../servicios/api';
 import type { Integrante, Movimiento } from '../tipos';
 import { obtenerFechaHoyLocal } from '../utilidades/fecha';
 
@@ -17,6 +18,22 @@ function formatearFechaHora(fecha: string): string {
   });
 }
 
+function claseChip(tipo: Movimiento['tipo']): string {
+  if (tipo === 'compra') return 'chip-compra';
+  if (tipo === 'reversion') return 'chip-reversion';
+  return 'chip-consumo';
+}
+
+function etiquetaChip(tipo: Movimiento['tipo']): string {
+  if (tipo === 'compra') return '🐣 compra';
+  if (tipo === 'reversion') return '↩️ reversión';
+  return '🍗 consumo';
+}
+
+function sumaSaldo(tipo: Movimiento['tipo']): boolean {
+  return tipo === 'compra' || tipo === 'reversion';
+}
+
 export default function PaginaHistorial() {
   const { token } = useAuth();
   const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
@@ -26,6 +43,7 @@ export default function PaginaHistorial() {
   const [cargandoMovimientos, setCargandoMovimientos] = useState(true);
   const [cargandoIntegrantes, setCargandoIntegrantes] = useState(true);
   const [error, setError] = useState('');
+  const [confirmacion, setConfirmacion] = useState<Movimiento | null>(null);
 
   const cargarIntegrantes = useCallback(async () => {
     if (!token) return;
@@ -65,6 +83,13 @@ export default function PaginaHistorial() {
   useEffect(() => {
     cargarMovimientos();
   }, [cargarMovimientos]);
+
+  async function manejarRevertir(movimiento: Movimiento) {
+    if (!token) return;
+    await revertirMovimiento(token, movimiento.id);
+    await cargarMovimientos();
+    await cargarIntegrantes();
+  }
 
   const cargando = cargandoMovimientos || cargandoIntegrantes;
 
@@ -138,32 +163,62 @@ export default function PaginaHistorial() {
             >
               <div className="flex items-center gap-3">
                 <span
-                  className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                    mov.tipo === 'compra' ? 'chip-compra' : 'chip-consumo'
-                  }`}
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${claseChip(mov.tipo)}`}
                 >
-                  {mov.tipo === 'compra' ? '🐣 compra' : '🍗 consumo'}
+                  {etiquetaChip(mov.tipo)}
                 </span>
                 <div>
                   <p className="font-medium">{mov.integrantes?.nombre ?? '—'}</p>
                   <p className="text-xs text-white/40">{mov.nota}</p>
                 </div>
               </div>
-              <div className="text-right">
-                <p
-                  className={`font-display text-lg ${
-                    mov.tipo === 'compra' ? 'text-pollo-verde' : 'text-pollo-naranja'
-                  }`}
-                >
-                  {mov.tipo === 'compra' ? '+' : '-'}
-                  {mov.cantidad}
-                </p>
-                <p className="text-xs text-white/30">{formatearFechaHora(mov.fecha)}</p>
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <p
+                    className={`font-display text-lg ${
+                      sumaSaldo(mov.tipo) ? 'text-pollo-verde' : 'text-pollo-naranja'
+                    }`}
+                  >
+                    {sumaSaldo(mov.tipo) ? '+' : '-'}
+                    {mov.cantidad}
+                  </p>
+                  <p className="text-xs text-white/30">{formatearFechaHora(mov.fecha)}</p>
+                </div>
+                {mov.tipo === 'consumo' &&
+                  (mov.revertido ? (
+                    <span className="rounded-lg border border-white/10 px-2.5 py-1 text-xs text-white/30">
+                      revertido
+                    </span>
+                  ) : (
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setConfirmacion(mov)}
+                      title="Revertir consumo"
+                      className="rounded-lg border border-pollo-neon/40 px-2.5 py-1.5 text-xs text-pollo-neon transition hover:bg-pollo-neon/10"
+                    >
+                      ↩️ Revertir
+                    </motion.button>
+                  ))}
               </div>
             </motion.div>
           ))}
         </div>
       )}
+
+      <ModalConfirmacion
+        abierto={!!confirmacion}
+        titulo="¿Revertir consumo? ↩️"
+        mensaje={
+          confirmacion
+            ? `Se le va a devolver ${confirmacion.cantidad} menú a ${
+                confirmacion.integrantes?.nombre ?? 'este integrante'
+              }. ¿Confirmás?`
+            : ''
+        }
+        textoConfirmar="↩️ Revertir"
+        onConfirmar={confirmacion ? () => manejarRevertir(confirmacion) : async () => {}}
+        onCancelar={() => setConfirmacion(null)}
+      />
     </main>
   );
 }

@@ -72,6 +72,12 @@ body {
   color: #ff8c42;
 }
 
+.chip-reversion {
+  background: rgba(255, 215, 0, 0.15);
+  border: 1px solid rgba(255, 215, 0, 0.4);
+  color: #ffd700;
+}
+
 .fondo-particulas {
   position: fixed;
   inset: 0;

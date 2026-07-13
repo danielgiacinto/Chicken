@@ -16,10 +16,11 @@ export interface TotalesIntegrantes {
 export interface Movimiento {
   id: string;
   integrante_id: string;
-  tipo: 'compra' | 'consumo';
+  tipo: 'compra' | 'consumo' | 'reversion';
   cantidad: number;
   fecha: string;
   nota: string | null;
+  revertido?: boolean;
   integrantes?: { nombre: string };
 }
 
