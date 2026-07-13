@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import { useState } from 'react';
 import type { Integrante, TotalesIntegrantes } from '../tipos';
 import ModalCompra from './ModalCompra';
+import ModalConfirmacion from './ModalConfirmacion';
 
 interface AccionExitosa {
   tipo: 'consumo' | 'compra';
@@ -49,6 +50,10 @@ export default function TablaIntegrantes({
   const [cargandoId, setCargandoId] = useState<string | null>(null);
   const [cargandoMasivo, setCargandoMasivo] = useState(false);
   const [shakeId, setShakeId] = useState<string | null>(null);
+  const [confirmacion, setConfirmacion] = useState<{
+    mensaje: string;
+    onConfirmar: () => Promise<void>;
+  } | null>(null);
 
   const integranteModal = integrantes.find((i) => i.id === modalIndividual);
   const puedePicotear = totales.saldo > 0;
@@ -71,6 +76,23 @@ export default function TablaIntegrantes({
     } else {
       setSeleccionados(new Set(integrantes.map((i) => i.id)));
     }
+  }
+
+  function solicitarConsumir(integrante: Integrante) {
+    setConfirmacion({
+      mensaje: `¿Seguro que ${integrante.nombre} va a picotear un menú? 🍗`,
+      onConfirmar: () => manejarConsumir(integrante),
+    });
+  }
+
+  function solicitarConsumirMasivo() {
+    if (idsSeleccionados.length === 0) return;
+    setConfirmacion({
+      mensaje: `¿Seguro que querés picotear un menú para ${idsSeleccionados.length} integrante${
+        idsSeleccionados.length > 1 ? 's' : ''
+      }? 🍗`,
+      onConfirmar: manejarConsumirMasivo,
+    });
   }
 
   async function manejarConsumir(integrante: Integrante) {
@@ -137,7 +159,7 @@ export default function TablaIntegrantes({
         </span>
         <button
           disabled={!puedePicotear || cargandoMasivo || idsSeleccionados.length > totales.saldo}
-          onClick={manejarConsumirMasivo}
+          onClick={solicitarConsumirMasivo}
           className="btn-picotear rounded-lg px-3 py-1.5 text-xs text-white disabled:opacity-30"
         >
           🍗 Picotear seleccionados
@@ -227,7 +249,7 @@ export default function TablaIntegrantes({
                       <motion.button
                         whileTap={{ scale: 0.95 }}
                         disabled={!puedePicotear || cargandoId === integrante.id}
-                        onClick={() => manejarConsumir(integrante)}
+                        onClick={() => solicitarConsumir(integrante)}
                         className="btn-picotear rounded-lg px-3 py-1.5 text-xs font-medium text-white disabled:opacity-30"
                       >
                         🍗 Picotear
@@ -310,7 +332,7 @@ export default function TablaIntegrantes({
               <div className="flex gap-2">
                 <button
                   disabled={!puedePicotear || cargandoId === integrante.id}
-                  onClick={() => manejarConsumir(integrante)}
+                  onClick={() => solicitarConsumir(integrante)}
                   className="btn-picotear flex-1 rounded-lg py-2 text-xs text-white disabled:opacity-30"
                 >
                   🍗 Picotear
@@ -345,6 +367,14 @@ export default function TablaIntegrantes({
         nombreIntegrante={`${idsSeleccionados.length} integrantes`}
         onCerrar={() => setModalMasivo(false)}
         onConfirmar={manejarComprarMasivo}
+      />
+
+      <ModalConfirmacion
+        abierto={!!confirmacion}
+        mensaje={confirmacion?.mensaje ?? ''}
+        textoConfirmar="🍗 Picotear"
+        onConfirmar={confirmacion?.onConfirmar ?? (async () => {})}
+        onCancelar={() => setConfirmacion(null)}
       />
     </>
   );
