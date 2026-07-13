@@ -36,7 +36,7 @@ async function crearToken(usuario: string): Promise<string> {
   return new SignJWT({ sub: usuario })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime('24h')
+    .setExpirationTime('30d')
     .sign(obtenerSecretoJwt());
 }
 
