@@ -1,6 +1,5 @@
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import BadgeAlias from './BadgeAlias';
 
@@ -103,28 +102,26 @@ export default function Encabezado({
           </div>
         </div>
         <BadgeAlias alias={aliasChicken} />
-        <Link
-          to="/pedido"
-          className="glass-card rounded-xl px-4 py-2 text-sm text-white/70 transition hover:text-pollo-neon"
-        >
-          📱 Pedido
-        </Link>
-        <Link
-          to="/menus"
-          className="glass-card rounded-xl px-4 py-2 text-sm text-white/70 transition hover:text-pollo-neon"
-        >
-          🍽️ Menús
-        </Link>
-        <Link
-          to="/historial"
-          className="glass-card rounded-xl px-4 py-2 text-sm text-white/70 transition hover:text-pollo-neon"
-        >
-          📜 Historial
-        </Link>
         <button
           onClick={logout}
-          className="rounded-xl border border-white/10 px-4 py-2 text-sm text-white/50 transition hover:border-red-500/30 hover:text-red-400"
+          title="Salir"
+          className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm text-white/50 transition hover:border-red-500/30 hover:text-red-400"
         >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-4 w-4"
+            aria-hidden="true"
+          >
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
           Salir
         </button>
       </div>

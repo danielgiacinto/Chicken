@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import Encabezado from '../componentes/Encabezado';
 import ModalAviso from '../componentes/ModalAviso';
 import TablaIntegrantes from '../componentes/TablaIntegrantes';
@@ -156,6 +157,27 @@ export default function PaginaDashboard() {
           }
         }}
       />
+
+      <nav className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Link
+          to="/pedido"
+          className="glass-card flex items-center justify-center rounded-xl px-4 py-3.5 text-center text-sm font-medium text-white/80 transition hover:border-pollo-neon/40 hover:text-pollo-neon"
+        >
+          📱 Hacer Pedido
+        </Link>
+        <Link
+          to="/menus"
+          className="glass-card flex items-center justify-center rounded-xl px-4 py-3.5 text-center text-sm font-medium text-white/80 transition hover:border-pollo-neon/40 hover:text-pollo-neon"
+        >
+          🍽️ Menús
+        </Link>
+        <Link
+          to="/historial"
+          className="glass-card flex items-center justify-center rounded-xl px-4 py-3.5 text-center text-sm font-medium text-white/80 transition hover:border-pollo-neon/40 hover:text-pollo-neon"
+        >
+          📜 Historial de movimientos
+        </Link>
+      </nav>
 
       <ModalAviso abierto={!!aviso} mensaje={aviso} onCerrar={() => setAviso('')} />
     </main>
