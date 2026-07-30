@@ -5,6 +5,7 @@ import PaginaDashboard from './paginas/PaginaDashboard';
 import PaginaHistorial from './paginas/PaginaHistorial';
 import PaginaMenus from './paginas/PaginaMenus';
 import PaginaPedido from './paginas/PaginaPedido';
+import PaginaConfiguracion from './paginas/PaginaConfiguracion';
 import FondoParticulas from './componentes/FondoParticulas';
 
 function RutaProtegida({ children }: { children: React.ReactNode }) {
@@ -49,6 +50,14 @@ export default function App() {
             element={
               <RutaProtegida>
                 <PaginaPedido />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/configuracion"
+            element={
+              <RutaProtegida>
+                <PaginaConfiguracion />
               </RutaProtegida>
             }
           />

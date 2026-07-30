@@ -75,6 +75,18 @@ export async function actualizarNombreIntegrante(
   );
 }
 
+export async function actualizarIntegrante(
+  token: string,
+  id: string,
+  datos: { nombre?: string; menus_comprados?: number; menus_usados?: number },
+): Promise<{ integrante: Integrante }> {
+  return solicitud(
+    `/integrantes/${id}`,
+    { method: 'PATCH', body: JSON.stringify(datos) },
+    token,
+  );
+}
+
 export async function consumirMenu(
   token: string,
   id: string,
@@ -155,6 +167,22 @@ export async function actualizarValorMenu(
 export async function actualizarContactoWpp(
   token: string,
   datos: { contacto_wpp_nombre?: string; contacto_wpp_numero?: string },
+): Promise<{ configuracion: Configuracion }> {
+  return solicitud(
+    '/configuracion',
+    { method: 'PATCH', body: JSON.stringify(datos) },
+    token,
+  );
+}
+
+export async function actualizarConfiguracion(
+  token: string,
+  datos: {
+    valor_menu?: number;
+    alias_chicken?: string;
+    contacto_wpp_nombre?: string;
+    contacto_wpp_numero?: string;
+  },
 ): Promise<{ configuracion: Configuracion }> {
   return solicitud(
     '/configuracion',

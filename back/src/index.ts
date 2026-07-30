@@ -326,17 +326,44 @@ app.post('/integrantes/:id/consumir', verificarJwt, async (c) => {
 
 app.patch('/integrantes/:id', verificarJwt, async (c) => {
   const id = c.req.param('id');
-  const cuerpo = await c.req.json<{ nombre?: string }>();
-  const nombre = cuerpo.nombre?.trim();
+  const cuerpo = await c.req.json<{
+    nombre?: string;
+    menus_comprados?: number;
+    menus_usados?: number;
+  }>();
 
-  if (!nombre) {
-    return c.json({ error: 'El nombre es obligatorio' }, 400);
+  const actualizacion: Record<string, string | number> = {};
+
+  if (cuerpo.nombre !== undefined) {
+    const nombre = cuerpo.nombre.trim();
+    if (!nombre) {
+      return c.json({ error: 'El nombre es obligatorio' }, 400);
+    }
+    actualizacion.nombre = nombre;
+  }
+
+  if (cuerpo.menus_comprados !== undefined) {
+    if (!Number.isInteger(cuerpo.menus_comprados) || cuerpo.menus_comprados < 0) {
+      return c.json({ error: 'menus_comprados debe ser un entero >= 0' }, 400);
+    }
+    actualizacion.menus_comprados = cuerpo.menus_comprados;
+  }
+
+  if (cuerpo.menus_usados !== undefined) {
+    if (!Number.isInteger(cuerpo.menus_usados) || cuerpo.menus_usados < 0) {
+      return c.json({ error: 'menus_usados debe ser un entero >= 0' }, 400);
+    }
+    actualizacion.menus_usados = cuerpo.menus_usados;
+  }
+
+  if (Object.keys(actualizacion).length === 0) {
+    return c.json({ error: 'No hay campos para actualizar' }, 400);
   }
 
   const supabase = obtenerSupabase();
   const { data: actualizado, error } = await supabase
     .from('integrantes')
-    .update({ nombre })
+    .update(actualizacion)
     .eq('id', id)
     .select('*')
     .single();
@@ -345,7 +372,7 @@ app.patch('/integrantes/:id', verificarJwt, async (c) => {
     if (error.code === '23505') {
       return c.json({ error: 'Ya existe un integrante con ese nombre' }, 400);
     }
-    return c.json({ error: error.message }, 500);
+    return c.json({ error: mapearErrorDb(error.message) }, 500);
   }
 
   if (!actualizado) {
@@ -529,6 +556,7 @@ app.get('/configuracion', verificarJwt, async (c) => {
 app.patch('/configuracion', verificarJwt, async (c) => {
   const cuerpo = await c.req.json<{
     valor_menu?: number;
+    alias_chicken?: string;
     contacto_wpp_nombre?: string;
     contacto_wpp_numero?: string;
   }>();
@@ -540,6 +568,14 @@ app.patch('/configuracion', verificarJwt, async (c) => {
       return c.json({ error: 'El valor del menú debe ser un número positivo' }, 400);
     }
     actualizacion.valor_menu = cuerpo.valor_menu;
+  }
+
+  if (cuerpo.alias_chicken !== undefined) {
+    const alias = cuerpo.alias_chicken.trim();
+    if (!alias) {
+      return c.json({ error: 'El alias es obligatorio' }, 400);
+    }
+    actualizacion.alias_chicken = alias;
   }
 
   if (cuerpo.contacto_wpp_nombre !== undefined) {

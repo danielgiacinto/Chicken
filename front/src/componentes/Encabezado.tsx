@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import BadgeAlias from './BadgeAlias';
 
@@ -102,6 +103,26 @@ export default function Encabezado({
           </div>
         </div>
         <BadgeAlias alias={aliasChicken} />
+        <Link
+          to="/configuracion"
+          title="Configuración"
+          className="inline-flex items-center justify-center rounded-xl border border-white/10 p-2.5 text-white/50 transition hover:border-pollo-neon/40 hover:text-pollo-neon"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-5 w-5"
+            aria-hidden="true"
+          >
+            <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.78 7.78 5.5 5.5 0 0 1 7.78-7.78zm0 0L15.5 7.5m0 0l3 3L22 4l-3-3-3.5 3.5z" />
+          </svg>
+          <span className="sr-only">Configuración</span>
+        </Link>
         <button
           onClick={logout}
           title="Salir"
