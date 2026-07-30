@@ -19,6 +19,7 @@ interface PropsTablaIntegrantes {
   onComprar: (id: string, cantidad: number) => Promise<void>;
   onConsumirMasivo: (ids: string[]) => Promise<{ procesados: string[] }>;
   onComprarMasivo: (ids: string[], cantidad: number) => Promise<{ procesados: string[]; cantidad: number }>;
+  onActualizarNombre: (id: string, nombre: string) => Promise<void>;
   onAccionExitosa: (accion: AccionExitosa) => void;
 }
 
@@ -42,6 +43,7 @@ export default function TablaIntegrantes({
   onComprar,
   onConsumirMasivo,
   onComprarMasivo,
+  onActualizarNombre,
   onAccionExitosa,
 }: PropsTablaIntegrantes) {
   const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
@@ -50,6 +52,9 @@ export default function TablaIntegrantes({
   const [cargandoId, setCargandoId] = useState<string | null>(null);
   const [cargandoMasivo, setCargandoMasivo] = useState(false);
   const [shakeId, setShakeId] = useState<string | null>(null);
+  const [editandoNombreId, setEditandoNombreId] = useState<string | null>(null);
+  const [nombreEditado, setNombreEditado] = useState('');
+  const [guardandoNombre, setGuardandoNombre] = useState(false);
   const [confirmacion, setConfirmacion] = useState<{
     mensaje: string;
     onConfirmar: () => Promise<void>;
@@ -75,6 +80,23 @@ export default function TablaIntegrantes({
       setSeleccionados(new Set());
     } else {
       setSeleccionados(new Set(integrantes.map((i) => i.id)));
+    }
+  }
+
+  function iniciarEdicionNombre(integrante: Integrante) {
+    setEditandoNombreId(integrante.id);
+    setNombreEditado(integrante.nombre);
+  }
+
+  async function guardarNombre(id: string) {
+    const nombre = nombreEditado.trim();
+    if (!nombre) return;
+    setGuardandoNombre(true);
+    try {
+      await onActualizarNombre(id, nombre);
+      setEditandoNombreId(null);
+    } finally {
+      setGuardandoNombre(false);
     }
   }
 
@@ -229,7 +251,44 @@ export default function TablaIntegrantes({
                       className="accent-pollo-neon"
                     />
                   </td>
-                  <td className="px-5 py-4 font-medium">{integrante.nombre}</td>
+                  <td className="px-5 py-4 font-medium">
+                    {editandoNombreId === integrante.id ? (
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="text"
+                          value={nombreEditado}
+                          onChange={(e) => setNombreEditado(e.target.value)}
+                          className="w-28 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-sm text-white"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') guardarNombre(integrante.id);
+                            if (e.key === 'Escape') setEditandoNombreId(null);
+                          }}
+                        />
+                        <button
+                          onClick={() => guardarNombre(integrante.id)}
+                          disabled={guardandoNombre}
+                          className="text-xs text-pollo-verde"
+                        >
+                          ✓
+                        </button>
+                        <button
+                          onClick={() => setEditandoNombreId(null)}
+                          className="text-xs text-white/40"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => iniciarEdicionNombre(integrante)}
+                        className="transition hover:text-pollo-neon"
+                        title="Clic para editar nombre"
+                      >
+                        {integrante.nombre}
+                      </button>
+                    )}
+                  </td>
                   <td className="px-5 py-4 text-center text-white/70">
                     {integrante.menus_comprados}
                   </td>
@@ -299,15 +358,46 @@ export default function TablaIntegrantes({
                   : 'border-white/10 bg-white/[0.03]'
               }`}
             >
-              <div className="mb-3 flex items-center justify-between">
-                <label className="flex items-center gap-2">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <label className="flex min-w-0 items-center gap-2">
                   <input
                     type="checkbox"
                     checked={seleccionados.has(integrante.id)}
                     onChange={() => alternarSeleccion(integrante.id)}
                     className="accent-pollo-neon"
                   />
-                  <span className="font-display text-lg">{integrante.nombre}</span>
+                  {editandoNombreId === integrante.id ? (
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="text"
+                        value={nombreEditado}
+                        onChange={(e) => setNombreEditado(e.target.value)}
+                        className="w-28 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-sm text-white"
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => guardarNombre(integrante.id)}
+                        disabled={guardandoNombre}
+                        className="text-xs text-pollo-verde"
+                      >
+                        ✓
+                      </button>
+                      <button
+                        onClick={() => setEditandoNombreId(null)}
+                        className="text-xs text-white/40"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => iniciarEdicionNombre(integrante)}
+                      className="font-display text-lg transition hover:text-pollo-neon"
+                      title="Clic para editar nombre"
+                    >
+                      {integrante.nombre}
+                    </button>
+                  )}
                 </label>
                 <span className={`font-display text-2xl ${colorSaldo(integrante.saldo)}`}>
                   {integrante.saldo}

@@ -104,6 +104,18 @@ export default function Encabezado({
         </div>
         <BadgeAlias alias={aliasChicken} />
         <Link
+          to="/pedido"
+          className="glass-card rounded-xl px-4 py-2 text-sm text-white/70 transition hover:text-pollo-neon"
+        >
+          📱 Pedido
+        </Link>
+        <Link
+          to="/menus"
+          className="glass-card rounded-xl px-4 py-2 text-sm text-white/70 transition hover:text-pollo-neon"
+        >
+          🍽️ Menús
+        </Link>
+        <Link
           to="/historial"
           className="glass-card rounded-xl px-4 py-2 text-sm text-white/70 transition hover:text-pollo-neon"
         >

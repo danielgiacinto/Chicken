@@ -5,6 +5,7 @@ import ModalAviso from '../componentes/ModalAviso';
 import TablaIntegrantes from '../componentes/TablaIntegrantes';
 import { useAuth } from '../hooks/useAuth';
 import {
+  actualizarNombreIntegrante,
   actualizarValorMenu,
   comprarMenus,
   comprarMenusMasivo,
@@ -27,6 +28,8 @@ export default function PaginaDashboard() {
     id: 1,
     valor_menu: 8550,
     alias_chicken: 'viviana.teruel',
+    contacto_wpp_nombre: 'David Chicken',
+    contacto_wpp_numero: '5493513034351',
   });
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
@@ -97,6 +100,12 @@ export default function PaginaDashboard() {
     setConfiguracion(resp.configuracion);
   }
 
+  async function manejarNombreActualizado(id: string, nombre: string) {
+    if (!token) return;
+    await actualizarNombreIntegrante(token, id, nombre);
+    await cargarDatos();
+  }
+
   if (cargando) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -130,6 +139,7 @@ export default function PaginaDashboard() {
         onComprar={manejarComprar}
         onConsumirMasivo={manejarConsumirMasivo}
         onComprarMasivo={manejarComprarMasivo}
+        onActualizarNombre={manejarNombreActualizado}
         onAccionExitosa={(accion) => {
           if (accion.tipo === 'consumo') {
             if (accion.masivo && accion.personas) {

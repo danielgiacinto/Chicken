@@ -1,7 +1,9 @@
 import type {
+  Comida,
   Configuracion,
   Integrante,
   Movimiento,
+  Pedido,
   RespuestaIntegrantes,
 } from '../tipos';
 
@@ -59,6 +61,18 @@ export async function obtenerIntegrantes(
   token: string,
 ): Promise<RespuestaIntegrantes> {
   return solicitud('/integrantes', {}, token);
+}
+
+export async function actualizarNombreIntegrante(
+  token: string,
+  id: string,
+  nombre: string,
+): Promise<{ integrante: Integrante }> {
+  return solicitud(
+    `/integrantes/${id}`,
+    { method: 'PATCH', body: JSON.stringify({ nombre }) },
+    token,
+  );
 }
 
 export async function consumirMenu(
@@ -134,6 +148,77 @@ export async function actualizarValorMenu(
   return solicitud(
     '/configuracion',
     { method: 'PATCH', body: JSON.stringify({ valor_menu: valorMenu }) },
+    token,
+  );
+}
+
+export async function actualizarContactoWpp(
+  token: string,
+  datos: { contacto_wpp_nombre?: string; contacto_wpp_numero?: string },
+): Promise<{ configuracion: Configuracion }> {
+  return solicitud(
+    '/configuracion',
+    { method: 'PATCH', body: JSON.stringify(datos) },
+    token,
+  );
+}
+
+export async function obtenerComidas(
+  token: string,
+  soloActivas = false,
+): Promise<{ comidas: Comida[] }> {
+  const query = soloActivas ? '?activas=1' : '';
+  return solicitud(`/comidas${query}`, {}, token);
+}
+
+export async function crearComida(
+  token: string,
+  nombre: string,
+): Promise<{ comida: Comida }> {
+  return solicitud(
+    '/comidas',
+    { method: 'POST', body: JSON.stringify({ nombre }) },
+    token,
+  );
+}
+
+export async function actualizarComida(
+  token: string,
+  id: string,
+  datos: { nombre?: string; activo?: boolean },
+): Promise<{ comida: Comida }> {
+  return solicitud(
+    `/comidas/${id}`,
+    { method: 'PATCH', body: JSON.stringify(datos) },
+    token,
+  );
+}
+
+export async function obtenerPedidos(
+  token: string,
+): Promise<{ pedidos: Pedido[] }> {
+  return solicitud('/pedidos', {}, token);
+}
+
+export async function crearPedido(
+  token: string,
+  items: { integrante_id: string; comida_id: string }[],
+): Promise<{ pedido: Pedido; contacto_wpp_numero: string }> {
+  return solicitud(
+    '/pedidos',
+    { method: 'POST', body: JSON.stringify({ items }) },
+    token,
+  );
+}
+
+export async function actualizarEstadoPedido(
+  token: string,
+  id: string,
+  estado: 'reservado' | 'cancelado',
+): Promise<{ pedido: Pedido; procesados?: string[] }> {
+  return solicitud(
+    `/pedidos/${id}/estado`,
+    { method: 'PATCH', body: JSON.stringify({ estado }) },
     token,
   );
 }

@@ -28,9 +28,37 @@ export interface Configuracion {
   id: number;
   valor_menu: number;
   alias_chicken: string;
+  contacto_wpp_nombre: string;
+  contacto_wpp_numero: string;
 }
 
 export interface RespuestaIntegrantes {
   integrantes: Integrante[];
   totales: TotalesIntegrantes;
+}
+
+export interface Comida {
+  id: string;
+  nombre: string;
+  activo: boolean;
+  creado_en?: string;
+}
+
+export type EstadoPedido = 'pendiente' | 'reservado' | 'cancelado';
+
+export interface ItemPedido {
+  id?: string;
+  integrante_id: string;
+  comida_id: string;
+  integrante_nombre: string;
+  comida_nombre: string;
+}
+
+export interface Pedido {
+  id: string;
+  fecha: string;
+  estado: EstadoPedido;
+  mensaje: string;
+  creado_en: string;
+  items: ItemPedido[];
 }

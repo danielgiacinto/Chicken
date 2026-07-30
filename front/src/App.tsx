@@ -3,6 +3,8 @@ import { useAuth } from './hooks/useAuth';
 import PaginaLogin from './paginas/PaginaLogin';
 import PaginaDashboard from './paginas/PaginaDashboard';
 import PaginaHistorial from './paginas/PaginaHistorial';
+import PaginaMenus from './paginas/PaginaMenus';
+import PaginaPedido from './paginas/PaginaPedido';
 import FondoParticulas from './componentes/FondoParticulas';
 
 function RutaProtegida({ children }: { children: React.ReactNode }) {
@@ -31,6 +33,22 @@ export default function App() {
             element={
               <RutaProtegida>
                 <PaginaHistorial />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/menus"
+            element={
+              <RutaProtegida>
+                <PaginaMenus />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/pedido"
+            element={
+              <RutaProtegida>
+                <PaginaPedido />
               </RutaProtegida>
             }
           />

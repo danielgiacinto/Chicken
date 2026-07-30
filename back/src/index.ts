@@ -324,6 +324,42 @@ app.post('/integrantes/:id/consumir', verificarJwt, async (c) => {
   });
 });
 
+app.patch('/integrantes/:id', verificarJwt, async (c) => {
+  const id = c.req.param('id');
+  const cuerpo = await c.req.json<{ nombre?: string }>();
+  const nombre = cuerpo.nombre?.trim();
+
+  if (!nombre) {
+    return c.json({ error: 'El nombre es obligatorio' }, 400);
+  }
+
+  const supabase = obtenerSupabase();
+  const { data: actualizado, error } = await supabase
+    .from('integrantes')
+    .update({ nombre })
+    .eq('id', id)
+    .select('*')
+    .single();
+
+  if (error) {
+    if (error.code === '23505') {
+      return c.json({ error: 'Ya existe un integrante con ese nombre' }, 400);
+    }
+    return c.json({ error: error.message }, 500);
+  }
+
+  if (!actualizado) {
+    return c.json({ error: 'Integrante no encontrado' }, 404);
+  }
+
+  return c.json({
+    integrante: {
+      ...actualizado,
+      saldo: actualizado.menus_comprados - actualizado.menus_usados,
+    },
+  });
+});
+
 app.post('/integrantes/:id/comprar', verificarJwt, async (c) => {
   const id = c.req.param('id');
   let cantidad = 10;
@@ -469,6 +505,8 @@ const CONFIGURACION_POR_DEFECTO = {
   id: 1,
   valor_menu: 8550,
   alias_chicken: 'viviana.teruel',
+  contacto_wpp_nombre: 'David Chicken',
+  contacto_wpp_numero: '5493513034351',
 };
 
 app.get('/configuracion', verificarJwt, async (c) => {
@@ -480,27 +518,440 @@ app.get('/configuracion', verificarJwt, async (c) => {
     .maybeSingle();
 
   if (error) return c.json({ error: error.message }, 500);
-  return c.json({ configuracion: data ?? CONFIGURACION_POR_DEFECTO });
+  return c.json({
+    configuracion: {
+      ...CONFIGURACION_POR_DEFECTO,
+      ...(data ?? {}),
+    },
+  });
 });
 
 app.patch('/configuracion', verificarJwt, async (c) => {
-  const cuerpo = await c.req.json<{ valor_menu?: number }>();
-  const valorMenu = cuerpo.valor_menu;
+  const cuerpo = await c.req.json<{
+    valor_menu?: number;
+    contacto_wpp_nombre?: string;
+    contacto_wpp_numero?: string;
+  }>();
 
-  if (valorMenu === undefined || Number.isNaN(valorMenu) || valorMenu <= 0) {
-    return c.json({ error: 'El valor del menú debe ser un número positivo' }, 400);
+  const actualizacion: Record<string, string | number> = {};
+
+  if (cuerpo.valor_menu !== undefined) {
+    if (Number.isNaN(cuerpo.valor_menu) || cuerpo.valor_menu <= 0) {
+      return c.json({ error: 'El valor del menú debe ser un número positivo' }, 400);
+    }
+    actualizacion.valor_menu = cuerpo.valor_menu;
+  }
+
+  if (cuerpo.contacto_wpp_nombre !== undefined) {
+    const nombre = cuerpo.contacto_wpp_nombre.trim();
+    if (!nombre) {
+      return c.json({ error: 'El nombre del contacto WhatsApp es obligatorio' }, 400);
+    }
+    actualizacion.contacto_wpp_nombre = nombre;
+  }
+
+  if (cuerpo.contacto_wpp_numero !== undefined) {
+    const numero = cuerpo.contacto_wpp_numero.replace(/\D/g, '');
+    if (!numero) {
+      return c.json({ error: 'El número de WhatsApp es obligatorio' }, 400);
+    }
+    actualizacion.contacto_wpp_numero = numero;
+  }
+
+  if (Object.keys(actualizacion).length === 0) {
+    return c.json({ error: 'No hay campos para actualizar' }, 400);
   }
 
   const supabase = obtenerSupabase();
   const { data, error } = await supabase
     .from('configuracion')
-    .update({ valor_menu: valorMenu })
+    .update(actualizacion)
     .eq('id', 1)
     .select('*')
     .single();
 
   if (error) return c.json({ error: error.message }, 500);
   return c.json({ configuracion: data });
+});
+
+app.get('/comidas', verificarJwt, async (c) => {
+  const soloActivas = c.req.query('activas') === '1';
+  const supabase = obtenerSupabase();
+
+  let consulta = supabase.from('comidas').select('*').order('nombre');
+  if (soloActivas) {
+    consulta = consulta.eq('activo', true);
+  }
+
+  const { data, error } = await consulta;
+  if (error) return c.json({ error: error.message }, 500);
+  return c.json({ comidas: data ?? [] });
+});
+
+app.post('/comidas', verificarJwt, async (c) => {
+  const cuerpo = await c.req.json<{ nombre?: string }>();
+  const nombre = cuerpo.nombre?.trim();
+
+  if (!nombre) {
+    return c.json({ error: 'El nombre de la comida es obligatorio' }, 400);
+  }
+
+  const supabase = obtenerSupabase();
+  const { data, error } = await supabase
+    .from('comidas')
+    .insert({ nombre })
+    .select('*')
+    .single();
+
+  if (error) {
+    if (error.code === '23505') {
+      return c.json({ error: 'Ya existe una comida con ese nombre' }, 400);
+    }
+    return c.json({ error: error.message }, 500);
+  }
+
+  return c.json({ comida: data }, 201);
+});
+
+app.patch('/comidas/:id', verificarJwt, async (c) => {
+  const id = c.req.param('id');
+  const cuerpo = await c.req.json<{ nombre?: string; activo?: boolean }>();
+  const actualizacion: { nombre?: string; activo?: boolean } = {};
+
+  if (cuerpo.nombre !== undefined) {
+    const nombre = cuerpo.nombre.trim();
+    if (!nombre) {
+      return c.json({ error: 'El nombre de la comida es obligatorio' }, 400);
+    }
+    actualizacion.nombre = nombre;
+  }
+
+  if (cuerpo.activo !== undefined) {
+    actualizacion.activo = Boolean(cuerpo.activo);
+  }
+
+  if (Object.keys(actualizacion).length === 0) {
+    return c.json({ error: 'No hay campos para actualizar' }, 400);
+  }
+
+  const supabase = obtenerSupabase();
+  const { data, error } = await supabase
+    .from('comidas')
+    .update(actualizacion)
+    .eq('id', id)
+    .select('*')
+    .single();
+
+  if (error) {
+    if (error.code === '23505') {
+      return c.json({ error: 'Ya existe una comida con ese nombre' }, 400);
+    }
+    return c.json({ error: error.message }, 500);
+  }
+
+  if (!data) {
+    return c.json({ error: 'Comida no encontrada' }, 404);
+  }
+
+  return c.json({ comida: data });
+});
+
+function armarMensajePedido(
+  nombreContacto: string,
+  items: { nombreComida: string }[],
+): string {
+  const conteo = new Map<string, number>();
+  for (const item of items) {
+    conteo.set(item.nombreComida, (conteo.get(item.nombreComida) ?? 0) + 1);
+  }
+
+  const lineas = Array.from(conteo.entries())
+    .sort(([a], [b]) => a.localeCompare(b, 'es'))
+    .map(([nombre, cantidad]) => `X${cantidad} ${nombre}`);
+
+  const saludo = nombreContacto.split(' ')[0] || 'David';
+  return `Hola ${saludo}, como estas?  Te mando el pedido de CUOS:\n${lineas.join('\n')}`;
+}
+
+app.get('/pedidos', verificarJwt, async (c) => {
+  const supabase = obtenerSupabase();
+  const { data, error } = await supabase
+    .from('pedidos')
+    .select(
+      `
+      *,
+      pedido_items (
+        id,
+        integrante_id,
+        comida_id,
+        integrantes ( nombre ),
+        comidas ( nombre )
+      )
+    `,
+    )
+    .order('creado_en', { ascending: false })
+    .limit(50);
+
+  if (error) return c.json({ error: error.message }, 500);
+
+  const pedidos = (data ?? []).map((pedido) => {
+    const { pedido_items, ...resto } = pedido as {
+      pedido_items?: {
+        id: string;
+        integrante_id: string;
+        comida_id: string;
+        integrantes?: { nombre: string } | null;
+        comidas?: { nombre: string } | null;
+      }[];
+      id: string;
+      fecha: string;
+      estado: string;
+      mensaje: string;
+      creado_en: string;
+    };
+
+    return {
+      ...resto,
+      items: (pedido_items ?? []).map((item) => ({
+        id: item.id,
+        integrante_id: item.integrante_id,
+        comida_id: item.comida_id,
+        integrante_nombre: item.integrantes?.nombre ?? '—',
+        comida_nombre: item.comidas?.nombre ?? '—',
+      })),
+    };
+  });
+
+  return c.json({ pedidos });
+});
+
+app.post('/pedidos', verificarJwt, async (c) => {
+  const cuerpo = await c.req.json<{
+    items?: { integrante_id: string; comida_id: string }[];
+  }>();
+  const items = cuerpo.items ?? [];
+
+  if (!Array.isArray(items) || items.length === 0) {
+    return c.json({ error: 'Seleccioná al menos un integrante con comida' }, 400);
+  }
+
+  const idsIntegrantes = items.map((i) => i.integrante_id);
+  if (new Set(idsIntegrantes).size !== idsIntegrantes.length) {
+    return c.json({ error: 'Cada integrante solo puede pedir un menú' }, 400);
+  }
+
+  const supabase = obtenerSupabase();
+
+  const { data: config } = await supabase
+    .from('configuracion')
+    .select('contacto_wpp_nombre, contacto_wpp_numero')
+    .eq('id', 1)
+    .maybeSingle();
+
+  const nombreContacto =
+    config?.contacto_wpp_nombre ?? CONFIGURACION_POR_DEFECTO.contacto_wpp_nombre;
+  const numeroContacto =
+    config?.contacto_wpp_numero ?? CONFIGURACION_POR_DEFECTO.contacto_wpp_numero;
+
+  const idsComidas = [...new Set(items.map((i) => i.comida_id))];
+  const { data: comidas, error: errorComidas } = await supabase
+    .from('comidas')
+    .select('id, nombre, activo')
+    .in('id', idsComidas);
+
+  if (errorComidas) return c.json({ error: errorComidas.message }, 500);
+
+  const mapaComidas = new Map((comidas ?? []).map((c) => [c.id, c]));
+  for (const item of items) {
+    const comida = mapaComidas.get(item.comida_id);
+    if (!comida || !comida.activo) {
+      return c.json({ error: 'Hay una comida inválida o inactiva en el pedido' }, 400);
+    }
+  }
+
+  const { data: integrantes, error: errorIntegrantes } = await supabase
+    .from('integrantes')
+    .select('id, nombre')
+    .in('id', idsIntegrantes);
+
+  if (errorIntegrantes) return c.json({ error: errorIntegrantes.message }, 500);
+  if ((integrantes ?? []).length !== idsIntegrantes.length) {
+    return c.json({ error: 'Hay un integrante inválido en el pedido' }, 400);
+  }
+
+  const mensaje = armarMensajePedido(
+    nombreContacto,
+    items.map((item) => ({
+      nombreComida: mapaComidas.get(item.comida_id)!.nombre,
+    })),
+  );
+
+  const hoy = obtenerFechaHoyArgentina();
+  const { data: pedido, error: errorPedido } = await supabase
+    .from('pedidos')
+    .insert({
+      fecha: hoy,
+      estado: 'pendiente',
+      mensaje,
+    })
+    .select('*')
+    .single();
+
+  if (errorPedido || !pedido) {
+    return c.json({ error: errorPedido?.message ?? 'No se pudo crear el pedido' }, 500);
+  }
+
+  const { error: errorItems } = await supabase.from('pedido_items').insert(
+    items.map((item) => ({
+      pedido_id: pedido.id,
+      integrante_id: item.integrante_id,
+      comida_id: item.comida_id,
+    })),
+  );
+
+  if (errorItems) {
+    await supabase.from('pedidos').delete().eq('id', pedido.id);
+    return c.json({ error: errorItems.message }, 500);
+  }
+
+  const mapaNombres = new Map((integrantes ?? []).map((i) => [i.id, i.nombre]));
+
+  return c.json(
+    {
+      pedido: {
+        ...pedido,
+        items: items.map((item) => ({
+          integrante_id: item.integrante_id,
+          comida_id: item.comida_id,
+          integrante_nombre: mapaNombres.get(item.integrante_id) ?? '—',
+          comida_nombre: mapaComidas.get(item.comida_id)!.nombre,
+        })),
+      },
+      contacto_wpp_numero: numeroContacto,
+    },
+    201,
+  );
+});
+
+app.patch('/pedidos/:id/estado', verificarJwt, async (c) => {
+  const id = c.req.param('id');
+  const cuerpo = await c.req.json<{ estado?: string }>();
+  const nuevoEstado = cuerpo.estado;
+
+  if (nuevoEstado !== 'reservado' && nuevoEstado !== 'cancelado') {
+    return c.json({ error: 'Estado inválido. Usá reservado o cancelado' }, 400);
+  }
+
+  const supabase = obtenerSupabase();
+  const { data: pedido, error: errorPedido } = await supabase
+    .from('pedidos')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (errorPedido || !pedido) {
+    return c.json({ error: 'Pedido no encontrado' }, 404);
+  }
+
+  if (pedido.estado === 'reservado') {
+    return c.json({ error: 'Este pedido ya fue reservado' }, 400);
+  }
+
+  if (pedido.estado === 'cancelado') {
+    return c.json({ error: 'Este pedido está cancelado' }, 400);
+  }
+
+  if (pedido.estado !== 'pendiente') {
+    return c.json({ error: 'Solo se pueden actualizar pedidos pendientes' }, 400);
+  }
+
+  if (nuevoEstado === 'cancelado') {
+    const { data: actualizado, error } = await supabase
+      .from('pedidos')
+      .update({ estado: 'cancelado' })
+      .eq('id', id)
+      .select('*')
+      .single();
+
+    if (error) return c.json({ error: error.message }, 500);
+    return c.json({ pedido: actualizado });
+  }
+
+  const { data: items, error: errorItems } = await supabase
+    .from('pedido_items')
+    .select('integrante_id, integrantes(nombre)')
+    .eq('pedido_id', id);
+
+  if (errorItems) return c.json({ error: errorItems.message }, 500);
+
+  const listaItems = items ?? [];
+  if (listaItems.length === 0) {
+    return c.json({ error: 'El pedido no tiene ítems' }, 400);
+  }
+
+  let saldoTotal: number;
+  try {
+    saldoTotal = await obtenerSaldoTotal(supabase);
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : 'Error al consultar saldo' }, 500);
+  }
+
+  if (saldoTotal < listaItems.length) {
+    return c.json(
+      {
+        error: `Saldo total insuficiente. Hay ${saldoTotal} menús para ${listaItems.length} consumos`,
+      },
+      400,
+    );
+  }
+
+  const hoy = obtenerFechaHoyArgentina();
+  const procesados: string[] = [];
+
+  for (const item of listaItems) {
+    const { data: integrante, error: errorConsulta } = await supabase
+      .from('integrantes')
+      .select('*')
+      .eq('id', item.integrante_id)
+      .single();
+
+    if (errorConsulta || !integrante) {
+      return c.json({ error: 'Integrante del pedido no encontrado' }, 500);
+    }
+
+    const { error: errorActualizar } = await supabase
+      .from('integrantes')
+      .update({ menus_usados: integrante.menus_usados + 1, ultimo_pedido: hoy })
+      .eq('id', integrante.id);
+
+    if (errorActualizar) {
+      return c.json({ error: mapearErrorDb(errorActualizar.message) }, 500);
+    }
+
+    await supabase.from('movimientos').insert({
+      integrante_id: integrante.id,
+      tipo: 'consumo',
+      cantidad: 1,
+      nota: 'Pedido reservado',
+    });
+
+    const relacion = item.integrantes as { nombre: string } | { nombre: string }[] | null;
+    const nombreRel = Array.isArray(relacion)
+      ? (relacion[0]?.nombre ?? integrante.nombre)
+      : (relacion?.nombre ?? integrante.nombre);
+    procesados.push(nombreRel);
+  }
+
+  const { data: actualizado, error: errorEstado } = await supabase
+    .from('pedidos')
+    .update({ estado: 'reservado' })
+    .eq('id', id)
+    .select('*')
+    .single();
+
+  if (errorEstado) return c.json({ error: errorEstado.message }, 500);
+
+  return c.json({ pedido: actualizado, procesados });
 });
 
 export default app;

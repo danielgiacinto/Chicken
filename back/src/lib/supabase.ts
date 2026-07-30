@@ -40,6 +40,8 @@ export interface Configuracion {
   id: number;
   valor_menu: number;
   alias_chicken: string;
+  contacto_wpp_nombre?: string;
+  contacto_wpp_numero?: string;
 }
 
 export interface IntegranteConSaldo extends Integrante {
