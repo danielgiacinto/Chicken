@@ -44,14 +44,24 @@ export interface Comida {
   creado_en?: string;
 }
 
+export interface Guarnicion {
+  id: string;
+  nombre: string;
+  activo: boolean;
+  creado_en?: string;
+}
+
 export type EstadoPedido = 'pendiente' | 'reservado' | 'cancelado';
 
 export interface ItemPedido {
   id?: string;
   integrante_id: string;
   comida_id: string;
+  guarnicion_id?: string | null;
   integrante_nombre: string;
   comida_nombre: string;
+  guarnicion_nombre?: string | null;
+  etiqueta?: string;
 }
 
 export interface Pedido {

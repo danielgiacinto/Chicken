@@ -8,20 +8,26 @@ import {
   crearPedido,
   obtenerComidas,
   obtenerConfiguracion,
+  obtenerGuarniciones,
   obtenerIntegrantes,
   obtenerPedidos,
 } from '../servicios/api';
-import type { Comida, Configuracion, Integrante, Pedido } from '../tipos';
+import type { Comida, Configuracion, Guarnicion, Integrante, Pedido } from '../tipos';
+
+function textoItem(plato: string, guarnicion?: string | null): string {
+  if (guarnicion) return `${plato} con ${guarnicion}`;
+  return plato;
+}
 
 function armarMensajeVistaPrevia(
   nombreContacto: string,
-  selecciones: { comidaNombre: string }[],
+  selecciones: { etiqueta: string }[],
 ): string {
   if (selecciones.length === 0) return '';
 
   const conteo = new Map<string, number>();
   for (const s of selecciones) {
-    conteo.set(s.comidaNombre, (conteo.get(s.comidaNombre) ?? 0) + 1);
+    conteo.set(s.etiqueta, (conteo.get(s.etiqueta) ?? 0) + 1);
   }
 
   const lineas = Array.from(conteo.entries())
@@ -48,9 +54,12 @@ export default function PaginaPedido() {
   const { token } = useAuth();
   const [integrantes, setIntegrantes] = useState<Integrante[]>([]);
   const [comidas, setComidas] = useState<Comida[]>([]);
+  const [guarniciones, setGuarniciones] = useState<Guarnicion[]>([]);
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [config, setConfig] = useState<Configuracion | null>(null);
-  const [seleccion, setSeleccion] = useState<Record<string, string>>({});
+  const [seleccionPlato, setSeleccionPlato] = useState<Record<string, string>>({});
+  const [seleccionGuarnicion, setSeleccionGuarnicion] = useState<Record<string, string>>({});
+  const [mensajeEditable, setMensajeEditable] = useState('');
   const [cargando, setCargando] = useState(true);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState('');
@@ -65,14 +74,17 @@ export default function PaginaPedido() {
     setCargando(true);
     setError('');
     try {
-      const [respIntegrantes, respComidas, respPedidos, respConfig] = await Promise.all([
-        obtenerIntegrantes(token),
-        obtenerComidas(token, true),
-        obtenerPedidos(token),
-        obtenerConfiguracion(token),
-      ]);
+      const [respIntegrantes, respComidas, respGuarniciones, respPedidos, respConfig] =
+        await Promise.all([
+          obtenerIntegrantes(token),
+          obtenerComidas(token, true),
+          obtenerGuarniciones(token, true),
+          obtenerPedidos(token),
+          obtenerConfiguracion(token),
+        ]);
       setIntegrantes(respIntegrantes.integrantes);
       setComidas(respComidas.comidas);
+      setGuarniciones(respGuarniciones.guarniciones);
       setPedidos(respPedidos.pedidos);
       setConfig(respConfig.configuracion);
     } catch {
@@ -87,28 +99,39 @@ export default function PaginaPedido() {
   }, [cargar]);
 
   const itemsElegidos = useMemo(() => {
-    return Object.entries(seleccion)
+    return Object.entries(seleccionPlato)
       .filter(([, comidaId]) => !!comidaId)
       .map(([integranteId, comidaId]) => {
         const comida = comidas.find((c) => c.id === comidaId);
+        const guarnicionId = seleccionGuarnicion[integranteId] || null;
+        const guarnicion = guarnicionId
+          ? guarniciones.find((g) => g.id === guarnicionId)
+          : null;
         const integrante = integrantes.find((i) => i.id === integranteId);
+        const platoNombre = comida?.nombre ?? '';
+        const guarnicionNombre = guarnicion?.nombre ?? null;
         return {
           integrante_id: integranteId,
           comida_id: comidaId,
-          comidaNombre: comida?.nombre ?? '',
+          guarnicion_id: guarnicionId,
+          etiqueta: textoItem(platoNombre, guarnicionNombre),
           integranteNombre: integrante?.nombre ?? '',
         };
       })
-      .filter((i) => i.comidaNombre);
-  }, [seleccion, comidas, integrantes]);
+      .filter((i) => i.etiqueta.length > 0);
+  }, [seleccionPlato, seleccionGuarnicion, comidas, guarniciones, integrantes]);
 
-  const mensajeVistaPrevia = useMemo(() => {
+  const mensajeGenerado = useMemo(() => {
     if (!config) return '';
     return armarMensajeVistaPrevia(
       config.contacto_wpp_nombre,
-      itemsElegidos.map((i) => ({ comidaNombre: i.comidaNombre })),
+      itemsElegidos.map((i) => ({ etiqueta: i.etiqueta })),
     );
   }, [config, itemsElegidos]);
+
+  useEffect(() => {
+    setMensajeEditable(mensajeGenerado);
+  }, [mensajeGenerado]);
 
   async function manejarEnviarWhatsApp() {
     if (!token || itemsElegidos.length === 0) return;
@@ -121,13 +144,16 @@ export default function PaginaPedido() {
         itemsElegidos.map((i) => ({
           integrante_id: i.integrante_id,
           comida_id: i.comida_id,
+          guarnicion_id: i.guarnicion_id || null,
         })),
+        mensajeEditable.trim() || undefined,
       );
 
       const url = `https://wa.me/${resp.contacto_wpp_numero}?text=${encodeURIComponent(resp.pedido.mensaje)}`;
       window.open(url, '_blank', 'noopener,noreferrer');
 
-      setSeleccion({});
+      setSeleccionPlato({});
+      setSeleccionGuarnicion({});
       setAviso('Pedido guardado como pendiente. Cuando David confirme, marcá Reservado.');
       await cargar();
     } catch (err) {
@@ -205,7 +231,7 @@ export default function PaginaPedido() {
 
       {comidas.length === 0 ? (
         <p className="mb-8 rounded-xl border border-pollo-naranja/30 bg-pollo-naranja/10 px-4 py-3 text-sm text-pollo-naranja">
-          No hay comidas activas.{' '}
+          No hay platos activos.{' '}
           <Link to="/menus" className="underline">
             Cargá el catálogo de menús
           </Link>{' '}
@@ -213,48 +239,82 @@ export default function PaginaPedido() {
         </p>
       ) : (
         <>
-          <section className="glass-card mb-6 space-y-3 rounded-2xl p-4">
+          <section className="glass-card mb-6 space-y-4 rounded-2xl p-4">
             <h2 className="font-display text-sm tracking-wide text-white/50">Armar pedido</h2>
-            {integrantes.map((integrante) => (
-              <div
-                key={integrante.id}
-                className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <span className="font-medium">{integrante.nombre}</span>
-                <select
-                  value={seleccion[integrante.id] ?? ''}
-                  onChange={(e) =>
-                    setSeleccion((prev) => ({
-                      ...prev,
-                      [integrante.id]: e.target.value,
-                    }))
-                  }
-                  className="select-tema w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white sm:max-w-xs"
-                >
-                  <option value="" className="bg-[#1a0f2e]">
-                    Sin pedido
-                  </option>
-                  {comidas.map((comida) => (
-                    <option key={comida.id} value={comida.id} className="bg-[#1a0f2e]">
-                      {comida.nombre}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ))}
+            {integrantes.map((integrante) => {
+              const platoId = seleccionPlato[integrante.id] ?? '';
+              return (
+                <div key={integrante.id} className="space-y-2 border-b border-white/5 pb-4 last:border-0 last:pb-0">
+                  <span className="font-medium">{integrante.nombre}</span>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <select
+                      value={platoId}
+                      onChange={(e) => {
+                        const valor = e.target.value;
+                        setSeleccionPlato((prev) => ({ ...prev, [integrante.id]: valor }));
+                        if (!valor) {
+                          setSeleccionGuarnicion((prev) => {
+                            const next = { ...prev };
+                            delete next[integrante.id];
+                            return next;
+                          });
+                        }
+                      }}
+                      className="select-tema w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white"
+                    >
+                      <option value="" className="bg-[#1a0f2e]">
+                        Sin pedido
+                      </option>
+                      {comidas.map((comida) => (
+                        <option key={comida.id} value={comida.id} className="bg-[#1a0f2e]">
+                          {comida.nombre}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={seleccionGuarnicion[integrante.id] ?? ''}
+                      disabled={!platoId}
+                      onChange={(e) =>
+                        setSeleccionGuarnicion((prev) => ({
+                          ...prev,
+                          [integrante.id]: e.target.value,
+                        }))
+                      }
+                      className="select-tema w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white disabled:opacity-40"
+                    >
+                      <option value="" className="bg-[#1a0f2e]">
+                        Sin guarnición
+                      </option>
+                      {guarniciones.map((guarnicion) => (
+                        <option
+                          key={guarnicion.id}
+                          value={guarnicion.id}
+                          className="bg-[#1a0f2e]"
+                        >
+                          {guarnicion.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              );
+            })}
           </section>
 
-          {mensajeVistaPrevia && (
+          {itemsElegidos.length > 0 && (
             <section className="glass-card mb-6 rounded-2xl p-4">
               <h2 className="mb-2 font-display text-sm tracking-wide text-white/50">
-                Vista previa WhatsApp
+                Mensaje WhatsApp (editable)
               </h2>
-              <pre className="whitespace-pre-wrap rounded-xl bg-black/30 p-4 text-sm text-white/80">
-                {mensajeVistaPrevia}
-              </pre>
+              <textarea
+                value={mensajeEditable}
+                onChange={(e) => setMensajeEditable(e.target.value)}
+                rows={Math.max(4, mensajeEditable.split('\n').length + 1)}
+                className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white/80"
+              />
               <motion.button
                 whileTap={{ scale: 0.97 }}
-                disabled={enviando || itemsElegidos.length === 0}
+                disabled={enviando || itemsElegidos.length === 0 || !mensajeEditable.trim()}
                 onClick={manejarEnviarWhatsApp}
                 className="btn-primario font-display mt-4 w-full rounded-xl py-3 text-sm tracking-wide disabled:opacity-50"
               >
@@ -301,10 +361,11 @@ export default function PaginaPedido() {
                 </div>
                 <ul className="mb-2 space-y-1 text-sm text-white/70">
                   {pedido.items.map((item) => (
-                    <li key={`${item.integrante_id}-${item.comida_id}`}>
+                    <li key={`${item.integrante_id}-${item.comida_id}-${item.guarnicion_id ?? ''}`}>
                       <strong className="text-white">{item.integrante_nombre}</strong>
                       {' → '}
-                      {item.comida_nombre}
+                      {item.etiqueta ??
+                        textoItem(item.comida_nombre, item.guarnicion_nombre)}
                     </li>
                   ))}
                 </ul>

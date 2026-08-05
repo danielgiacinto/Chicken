@@ -91,7 +91,7 @@ app.use(
       if (esOrigenPermitido(origen)) return origen;
       return null;
     },
-    allowMethods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
+    allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization'],
     maxAge: 86400,
   }),
@@ -692,13 +692,164 @@ app.patch('/comidas/:id', verificarJwt, async (c) => {
   return c.json({ comida: data });
 });
 
+app.delete('/comidas/:id', verificarJwt, async (c) => {
+  const id = c.req.param('id');
+  const supabase = obtenerSupabase();
+
+  const { count, error: errorRefs } = await supabase
+    .from('pedido_items')
+    .select('id', { count: 'exact', head: true })
+    .eq('comida_id', id);
+
+  if (errorRefs) return c.json({ error: errorRefs.message }, 500);
+
+  if ((count ?? 0) > 0) {
+    const { data, error } = await supabase
+      .from('comidas')
+      .update({ activo: false })
+      .eq('id', id)
+      .select('*')
+      .single();
+
+    if (error) return c.json({ error: error.message }, 500);
+    return c.json({
+      comida: data,
+      eliminado: false,
+      mensaje: 'La comida está en pedidos históricos; se desactivó',
+    });
+  }
+
+  const { error } = await supabase.from('comidas').delete().eq('id', id);
+  if (error) return c.json({ error: error.message }, 500);
+  return c.json({ eliminado: true });
+});
+
+app.get('/guarniciones', verificarJwt, async (c) => {
+  const soloActivas = c.req.query('activas') === '1';
+  const supabase = obtenerSupabase();
+
+  let consulta = supabase.from('guarniciones').select('*').order('nombre');
+  if (soloActivas) {
+    consulta = consulta.eq('activo', true);
+  }
+
+  const { data, error } = await consulta;
+  if (error) return c.json({ error: error.message }, 500);
+  return c.json({ guarniciones: data ?? [] });
+});
+
+app.post('/guarniciones', verificarJwt, async (c) => {
+  const cuerpo = await c.req.json<{ nombre?: string }>();
+  const nombre = cuerpo.nombre?.trim();
+
+  if (!nombre) {
+    return c.json({ error: 'El nombre de la guarnición es obligatorio' }, 400);
+  }
+
+  const supabase = obtenerSupabase();
+  const { data, error } = await supabase
+    .from('guarniciones')
+    .insert({ nombre })
+    .select('*')
+    .single();
+
+  if (error) {
+    if (error.code === '23505') {
+      return c.json({ error: 'Ya existe una guarnición con ese nombre' }, 400);
+    }
+    return c.json({ error: error.message }, 500);
+  }
+
+  return c.json({ guarnicion: data }, 201);
+});
+
+app.patch('/guarniciones/:id', verificarJwt, async (c) => {
+  const id = c.req.param('id');
+  const cuerpo = await c.req.json<{ nombre?: string; activo?: boolean }>();
+  const actualizacion: { nombre?: string; activo?: boolean } = {};
+
+  if (cuerpo.nombre !== undefined) {
+    const nombre = cuerpo.nombre.trim();
+    if (!nombre) {
+      return c.json({ error: 'El nombre de la guarnición es obligatorio' }, 400);
+    }
+    actualizacion.nombre = nombre;
+  }
+
+  if (cuerpo.activo !== undefined) {
+    actualizacion.activo = Boolean(cuerpo.activo);
+  }
+
+  if (Object.keys(actualizacion).length === 0) {
+    return c.json({ error: 'No hay campos para actualizar' }, 400);
+  }
+
+  const supabase = obtenerSupabase();
+  const { data, error } = await supabase
+    .from('guarniciones')
+    .update(actualizacion)
+    .eq('id', id)
+    .select('*')
+    .single();
+
+  if (error) {
+    if (error.code === '23505') {
+      return c.json({ error: 'Ya existe una guarnición con ese nombre' }, 400);
+    }
+    return c.json({ error: error.message }, 500);
+  }
+
+  if (!data) {
+    return c.json({ error: 'Guarnición no encontrada' }, 404);
+  }
+
+  return c.json({ guarnicion: data });
+});
+
+app.delete('/guarniciones/:id', verificarJwt, async (c) => {
+  const id = c.req.param('id');
+  const supabase = obtenerSupabase();
+
+  const { count, error: errorRefs } = await supabase
+    .from('pedido_items')
+    .select('id', { count: 'exact', head: true })
+    .eq('guarnicion_id', id);
+
+  if (errorRefs) return c.json({ error: errorRefs.message }, 500);
+
+  if ((count ?? 0) > 0) {
+    const { data, error } = await supabase
+      .from('guarniciones')
+      .update({ activo: false })
+      .eq('id', id)
+      .select('*')
+      .single();
+
+    if (error) return c.json({ error: error.message }, 500);
+    return c.json({
+      guarnicion: data,
+      eliminado: false,
+      mensaje: 'La guarnición está en pedidos históricos; se desactivó',
+    });
+  }
+
+  const { error } = await supabase.from('guarniciones').delete().eq('id', id);
+  if (error) return c.json({ error: error.message }, 500);
+  return c.json({ eliminado: true });
+});
+
+function textoItemPedido(nombrePlato: string, nombreGuarnicion?: string | null): string {
+  if (nombreGuarnicion) return `${nombrePlato} con ${nombreGuarnicion}`;
+  return nombrePlato;
+}
+
 function armarMensajePedido(
   nombreContacto: string,
-  items: { nombreComida: string }[],
+  items: { etiqueta: string }[],
 ): string {
   const conteo = new Map<string, number>();
   for (const item of items) {
-    conteo.set(item.nombreComida, (conteo.get(item.nombreComida) ?? 0) + 1);
+    conteo.set(item.etiqueta, (conteo.get(item.etiqueta) ?? 0) + 1);
   }
 
   const lineas = Array.from(conteo.entries())
@@ -720,8 +871,10 @@ app.get('/pedidos', verificarJwt, async (c) => {
         id,
         integrante_id,
         comida_id,
+        guarnicion_id,
         integrantes ( nombre ),
-        comidas ( nombre )
+        comidas ( nombre ),
+        guarniciones ( nombre )
       )
     `,
     )
@@ -736,8 +889,10 @@ app.get('/pedidos', verificarJwt, async (c) => {
         id: string;
         integrante_id: string;
         comida_id: string;
+        guarnicion_id?: string | null;
         integrantes?: { nombre: string } | null;
         comidas?: { nombre: string } | null;
+        guarniciones?: { nombre: string } | null;
       }[];
       id: string;
       fecha: string;
@@ -748,13 +903,20 @@ app.get('/pedidos', verificarJwt, async (c) => {
 
     return {
       ...resto,
-      items: (pedido_items ?? []).map((item) => ({
-        id: item.id,
-        integrante_id: item.integrante_id,
-        comida_id: item.comida_id,
-        integrante_nombre: item.integrantes?.nombre ?? '—',
-        comida_nombre: item.comidas?.nombre ?? '—',
-      })),
+      items: (pedido_items ?? []).map((item) => {
+        const comidaNombre = item.comidas?.nombre ?? '—';
+        const guarnicionNombre = item.guarniciones?.nombre ?? null;
+        return {
+          id: item.id,
+          integrante_id: item.integrante_id,
+          comida_id: item.comida_id,
+          guarnicion_id: item.guarnicion_id ?? null,
+          integrante_nombre: item.integrantes?.nombre ?? '—',
+          comida_nombre: comidaNombre,
+          guarnicion_nombre: guarnicionNombre,
+          etiqueta: textoItemPedido(comidaNombre, guarnicionNombre),
+        };
+      }),
     };
   });
 
@@ -763,9 +925,11 @@ app.get('/pedidos', verificarJwt, async (c) => {
 
 app.post('/pedidos', verificarJwt, async (c) => {
   const cuerpo = await c.req.json<{
-    items?: { integrante_id: string; comida_id: string }[];
+    items?: { integrante_id: string; comida_id: string; guarnicion_id?: string | null }[];
+    mensaje?: string;
   }>();
   const items = cuerpo.items ?? [];
+  const mensajeEditado = cuerpo.mensaje?.trim();
 
   if (!Array.isArray(items) || items.length === 0) {
     return c.json({ error: 'Seleccioná al menos un integrante con comida' }, 400);
@@ -805,6 +969,32 @@ app.post('/pedidos', verificarJwt, async (c) => {
     }
   }
 
+  const idsGuarniciones = [
+    ...new Set(items.map((i) => i.guarnicion_id).filter((id): id is string => !!id)),
+  ];
+  const mapaGuarniciones = new Map<string, { id: string; nombre: string; activo: boolean }>();
+
+  if (idsGuarniciones.length > 0) {
+    const { data: guarniciones, error: errorGuarniciones } = await supabase
+      .from('guarniciones')
+      .select('id, nombre, activo')
+      .in('id', idsGuarniciones);
+
+    if (errorGuarniciones) return c.json({ error: errorGuarniciones.message }, 500);
+
+    for (const g of guarniciones ?? []) {
+      mapaGuarniciones.set(g.id, g);
+    }
+
+    for (const item of items) {
+      if (!item.guarnicion_id) continue;
+      const guarnicion = mapaGuarniciones.get(item.guarnicion_id);
+      if (!guarnicion || !guarnicion.activo) {
+        return c.json({ error: 'Hay una guarnición inválida o inactiva en el pedido' }, 400);
+      }
+    }
+  }
+
   const { data: integrantes, error: errorIntegrantes } = await supabase
     .from('integrantes')
     .select('id, nombre')
@@ -815,12 +1005,21 @@ app.post('/pedidos', verificarJwt, async (c) => {
     return c.json({ error: 'Hay un integrante inválido en el pedido' }, 400);
   }
 
-  const mensaje = armarMensajePedido(
-    nombreContacto,
-    items.map((item) => ({
-      nombreComida: mapaComidas.get(item.comida_id)!.nombre,
-    })),
-  );
+  const etiquetas = items.map((item) => {
+    const plato = mapaComidas.get(item.comida_id)!.nombre;
+    const guarnicion = item.guarnicion_id
+      ? mapaGuarniciones.get(item.guarnicion_id)?.nombre
+      : null;
+    return textoItemPedido(plato, guarnicion);
+  });
+
+  const mensaje =
+    mensajeEditado && mensajeEditado.length > 0
+      ? mensajeEditado
+      : armarMensajePedido(
+          nombreContacto,
+          etiquetas.map((etiqueta) => ({ etiqueta })),
+        );
 
   const hoy = obtenerFechaHoyArgentina();
   const { data: pedido, error: errorPedido } = await supabase
@@ -842,6 +1041,7 @@ app.post('/pedidos', verificarJwt, async (c) => {
       pedido_id: pedido.id,
       integrante_id: item.integrante_id,
       comida_id: item.comida_id,
+      guarnicion_id: item.guarnicion_id || null,
     })),
   );
 
@@ -856,11 +1056,16 @@ app.post('/pedidos', verificarJwt, async (c) => {
     {
       pedido: {
         ...pedido,
-        items: items.map((item) => ({
+        items: items.map((item, index) => ({
           integrante_id: item.integrante_id,
           comida_id: item.comida_id,
+          guarnicion_id: item.guarnicion_id || null,
           integrante_nombre: mapaNombres.get(item.integrante_id) ?? '—',
           comida_nombre: mapaComidas.get(item.comida_id)!.nombre,
+          guarnicion_nombre: item.guarnicion_id
+            ? (mapaGuarniciones.get(item.guarnicion_id)?.nombre ?? null)
+            : null,
+          etiqueta: etiquetas[index],
         })),
       },
       contacto_wpp_numero: numeroContacto,

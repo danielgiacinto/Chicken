@@ -1,6 +1,7 @@
 import type {
   Comida,
   Configuracion,
+  Guarnicion,
   Integrante,
   Movimiento,
   Pedido,
@@ -222,6 +223,51 @@ export async function actualizarComida(
   );
 }
 
+export async function eliminarComida(
+  token: string,
+  id: string,
+): Promise<{ eliminado: boolean; mensaje?: string; comida?: Comida }> {
+  return solicitud(`/comidas/${id}`, { method: 'DELETE' }, token);
+}
+
+export async function obtenerGuarniciones(
+  token: string,
+  soloActivas = false,
+): Promise<{ guarniciones: Guarnicion[] }> {
+  const query = soloActivas ? '?activas=1' : '';
+  return solicitud(`/guarniciones${query}`, {}, token);
+}
+
+export async function crearGuarnicion(
+  token: string,
+  nombre: string,
+): Promise<{ guarnicion: Guarnicion }> {
+  return solicitud(
+    '/guarniciones',
+    { method: 'POST', body: JSON.stringify({ nombre }) },
+    token,
+  );
+}
+
+export async function actualizarGuarnicion(
+  token: string,
+  id: string,
+  datos: { nombre?: string; activo?: boolean },
+): Promise<{ guarnicion: Guarnicion }> {
+  return solicitud(
+    `/guarniciones/${id}`,
+    { method: 'PATCH', body: JSON.stringify(datos) },
+    token,
+  );
+}
+
+export async function eliminarGuarnicion(
+  token: string,
+  id: string,
+): Promise<{ eliminado: boolean; mensaje?: string; guarnicion?: Guarnicion }> {
+  return solicitud(`/guarniciones/${id}`, { method: 'DELETE' }, token);
+}
+
 export async function obtenerPedidos(
   token: string,
 ): Promise<{ pedidos: Pedido[] }> {
@@ -230,11 +276,12 @@ export async function obtenerPedidos(
 
 export async function crearPedido(
   token: string,
-  items: { integrante_id: string; comida_id: string }[],
+  items: { integrante_id: string; comida_id: string; guarnicion_id?: string | null }[],
+  mensaje?: string,
 ): Promise<{ pedido: Pedido; contacto_wpp_numero: string }> {
   return solicitud(
     '/pedidos',
-    { method: 'POST', body: JSON.stringify({ items }) },
+    { method: 'POST', body: JSON.stringify({ items, mensaje }) },
     token,
   );
 }
