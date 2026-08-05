@@ -53,7 +53,7 @@ function SeccionCatalogo({
   }
 
   return (
-    <section className="mb-10">
+    <section>
       <h2 className="mb-3 font-display text-lg text-pollo-neon">{titulo}</h2>
 
       <form onSubmit={manejarCrear} className="glass-card mb-4 flex gap-2 rounded-2xl p-4">
@@ -196,7 +196,7 @@ export default function PaginaMenus() {
   }
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-8">
+    <main className="mx-auto max-w-6xl px-4 py-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="font-display text-2xl text-pollo-neon">Menús</h1>
@@ -222,7 +222,7 @@ export default function PaginaMenus() {
       {cargando ? (
         <div className="py-12 text-center text-4xl">🐔</div>
       ) : (
-        <>
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:items-start">
           <SeccionCatalogo
             titulo="Platos"
             placeholder="Ej: Milanesa de carne"
@@ -274,7 +274,7 @@ export default function PaginaMenus() {
               });
             }}
           />
-        </>
+        </div>
       )}
     </main>
   );
