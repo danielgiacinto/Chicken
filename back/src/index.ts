@@ -36,7 +36,7 @@ async function crearToken(usuario: string): Promise<string> {
   return new SignJWT({ sub: usuario })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime('30d')
+    .setExpirationTime('180d')
     .sign(obtenerSecretoJwt());
 }
 
@@ -142,6 +142,57 @@ app.get('/integrantes', verificarJwt, async (c) => {
     { menus_comprados: 0, menus_usados: 0, saldo: 0 },
   );
   return c.json({ integrantes, totales });
+});
+
+app.post('/integrantes', verificarJwt, async (c) => {
+  const cuerpo = await c.req.json<{
+    nombre?: string;
+    menus_comprados?: number;
+    menus_usados?: number;
+  }>();
+  const nombre = cuerpo.nombre?.trim();
+
+  if (!nombre) {
+    return c.json({ error: 'El nombre es obligatorio' }, 400);
+  }
+
+  const menusComprados = cuerpo.menus_comprados ?? 0;
+  const menusUsados = cuerpo.menus_usados ?? 0;
+
+  if (!Number.isInteger(menusComprados) || menusComprados < 0) {
+    return c.json({ error: 'menus_comprados debe ser un entero >= 0' }, 400);
+  }
+  if (!Number.isInteger(menusUsados) || menusUsados < 0) {
+    return c.json({ error: 'menus_usados debe ser un entero >= 0' }, 400);
+  }
+
+  const supabase = obtenerSupabase();
+  const { data, error } = await supabase
+    .from('integrantes')
+    .insert({
+      nombre,
+      menus_comprados: menusComprados,
+      menus_usados: menusUsados,
+    })
+    .select('*')
+    .single();
+
+  if (error) {
+    if (error.code === '23505') {
+      return c.json({ error: 'Ya existe un integrante con ese nombre' }, 400);
+    }
+    return c.json({ error: mapearErrorDb(error.message) }, 500);
+  }
+
+  return c.json(
+    {
+      integrante: {
+        ...data,
+        saldo: data.menus_comprados - data.menus_usados,
+      },
+    },
+    201,
+  );
 });
 
 function mapearErrorDb(mensaje: string): string {

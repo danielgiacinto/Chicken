@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 import {
   actualizarConfiguracion,
   actualizarIntegrante,
+  crearIntegrante,
   obtenerConfiguracion,
   obtenerIntegrantes,
 } from '../servicios/api';
@@ -34,6 +35,8 @@ export default function PaginaConfiguracion() {
   const [cargando, setCargando] = useState(true);
   const [guardandoConfig, setGuardandoConfig] = useState(false);
   const [guardandoId, setGuardandoId] = useState<string | null>(null);
+  const [nuevoNombre, setNuevoNombre] = useState('');
+  const [creando, setCreando] = useState(false);
   const [error, setError] = useState('');
   const [aviso, setAviso] = useState('');
 
@@ -141,6 +144,24 @@ export default function PaginaConfiguracion() {
       setError(err instanceof Error ? err.message : 'No se pudo actualizar el integrante');
     } finally {
       setGuardandoId(null);
+    }
+  }
+
+  async function manejarCrearIntegrante(e: React.FormEvent) {
+    e.preventDefault();
+    if (!token || !nuevoNombre.trim()) return;
+    setCreando(true);
+    setError('');
+    setAviso('');
+    try {
+      await crearIntegrante(token, { nombre: nuevoNombre.trim() });
+      setNuevoNombre('');
+      setAviso('Integrante agregado');
+      await cargar();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo crear el integrante');
+    } finally {
+      setCreando(false);
     }
   }
 
@@ -262,6 +283,33 @@ export default function PaginaConfiguracion() {
 
       <section>
         <h2 className="mb-3 font-display text-lg text-pollo-neon">Integrantes</h2>
+
+        <form
+          onSubmit={manejarCrearIntegrante}
+          className="glass-card mb-4 flex flex-col gap-3 rounded-xl p-4 sm:flex-row sm:items-end"
+        >
+          <label className="block flex-1 text-sm">
+            <span className="mb-1 block text-xs uppercase tracking-wider text-white/40">
+              Nuevo integrante
+            </span>
+            <input
+              type="text"
+              value={nuevoNombre}
+              onChange={(e) => setNuevoNombre(e.target.value)}
+              placeholder="Ej: Dani"
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white"
+            />
+          </label>
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            type="submit"
+            disabled={creando || !nuevoNombre.trim()}
+            className="btn-primario font-display rounded-xl px-5 py-2.5 text-sm disabled:opacity-50"
+          >
+            {creando ? 'Agregando...' : 'Agregar'}
+          </motion.button>
+        </form>
+
         <div className="space-y-3">
           {integrantes.map((integrante) => {
             const datos = edicionIntegrantes[integrante.id];

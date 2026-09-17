@@ -88,6 +88,17 @@ export async function actualizarIntegrante(
   );
 }
 
+export async function crearIntegrante(
+  token: string,
+  datos: { nombre: string; menus_comprados?: number; menus_usados?: number },
+): Promise<{ integrante: Integrante }> {
+  return solicitud(
+    '/integrantes',
+    { method: 'POST', body: JSON.stringify(datos) },
+    token,
+  );
+}
+
 export async function consumirMenu(
   token: string,
   id: string,
